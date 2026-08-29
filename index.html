@@ -34,6 +34,7 @@
       <button class="tab" type="button" data-tab="medals">🥇 Medal Race</button>
       <button class="tab" type="button" data-tab="events">🎯 Events</button>
       <button class="tab" type="button" data-tab="schedule">🗓 Schedule</button>
+      <button class="tab admin-tab" type="button" data-tab="admin">🔐 Enter Scores</button>
     </nav>
 
     <div id="setup-message" class="setup-message" hidden><strong>Scoreboard is ready for Notion.</strong><span>Add the Cloudflare runtime secret to connect the live data.</span></div>
@@ -57,7 +58,7 @@
       </section>
 
       <section class="panel progress-panel">
-        <div class="panel__header"><div><p class="section-kicker">Tournament progress</p><h2>How Far We’ve Come</h2><p class="panel-note progress-note">An event counts as finished once a result is entered, even if its Notion status has not been changed yet.</p></div><span id="progress-label" class="big-percent">0%</span></div>
+        <div class="panel__header"><div><p class="section-kicker">Tournament progress</p><h2>How Far We’ve Come</h2><p class="panel-note progress-note">An event counts as finished once a gold result is entered, even if its Notion status was missed.</p></div><span id="progress-label" class="big-percent">0%</span></div>
         <div class="progress-track"><div id="progress-fill" class="progress-fill"></div></div>
         <div id="status-breakdown" class="status-breakdown"></div>
       </section>
@@ -85,6 +86,22 @@
       <section class="panel">
         <div class="panel__header"><div><p class="section-kicker">What’s next</p><h2>Schedule</h2></div><p class="panel-note">Sorted by scheduled time and event number.</p></div>
         <div id="schedule-list" class="schedule-list"></div>
+      </section>
+    </section>
+
+    <section class="tab-panel" data-panel="admin" hidden>
+      <section class="panel admin-panel">
+        <div class="panel__header"><div><p class="section-kicker">Scorekeeper only</p><h2>Enter Event Results</h2></div><p class="panel-note">Saving here updates the official Notion database immediately.</p></div>
+        <form id="score-form" class="score-form">
+          <label class="field field--wide"><span>Event</span><select id="admin-event" required><option value="">Choose an event…</option></select></label>
+          <label class="field"><span>🥇 Gold</span><select id="admin-gold" required></select></label>
+          <label class="field"><span>🥈 Silver</span><select id="admin-silver" required></select></label>
+          <label class="field"><span>🥉 Bronze 1</span><select id="admin-bronze-1"></select></label>
+          <label class="field"><span>🥉 Bronze 2</span><select id="admin-bronze-2"></select></label>
+          <label class="field field--wide"><span>Private score-entry code</span><input id="admin-code" type="password" autocomplete="off" inputmode="numeric" placeholder="Enter code" required /></label>
+          <div id="admin-preview" class="admin-preview">Pick an event to enter or edit its result.</div>
+          <div class="admin-actions"><button id="save-score" class="save-score" type="submit">Save Result to Notion</button><span id="admin-message" class="admin-message" aria-live="polite"></span></div>
+        </form>
       </section>
     </section>
 
