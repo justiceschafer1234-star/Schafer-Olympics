@@ -1,6 +1,13 @@
 const NOTION_VERSION = "2026-03-11";
 const DEFAULT_DATA_SOURCE_ID = "1bffd4df-3de3-4e8e-9c13-cbcb1e30e226";
 
+const TEAM_SCORE_FIELDS = [
+  { team: "Team Red", field: "🔴 Red Points" },
+  { team: "Team Blue", field: "🔵 Blue Points" },
+  { team: "Team Green", field: "🟢 Green Points" },
+  { team: "Team Gold", field: "🟡 Gold Points" },
+];
+
 function json(data, init = {}) {
   const headers = new Headers(init.headers || {});
   headers.set("Content-Type", "application/json; charset=utf-8");
@@ -72,6 +79,19 @@ function normalizeDataSourceId(value) {
   return String(value).trim().replace(/^collection:\/\//i, "");
 }
 
+function numberValue(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildStandings(rows) {
+  return TEAM_SCORE_FIELDS.map(({ team, field }) => ({
+    team,
+    points: rows.reduce((total, row) => total + numberValue(row.properties?.[field]), 0),
+  })).sort((a, b) => b.points - a.points || a.team.localeCompare(b.team));
+}
+
 async function queryAll(token, dataSourceId) {
   const results = [];
   let startCursor;
@@ -131,10 +151,14 @@ async function scoresResponse(env) {
 
   try {
     const pages = await queryAll(token, dataSourceId);
+    const rows = pages.map(normalizePage);
+    const standings = buildStandings(rows);
+
     return json(
       {
         configured: true,
-        rows: pages.map(normalizePage),
+        standings,
+        rows,
         dataSourceId,
         updatedAt: new Date().toISOString(),
       },
