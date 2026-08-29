@@ -66,3 +66,7 @@ If your Notion table uses different column names, edit `app.js` or update the ta
 The browser calls `/api/scores`. Only the Cloudflare Function talks to Notion. The Notion API token is read from `context.env.NOTION_API_TOKEN`, so it never needs to appear in HTML or browser JavaScript.
 
 Local secret files such as `.dev.vars` and `.env` are intentionally ignored by Git.
+
+## Deployment
+
+Cloudflare deployment trigger updated on August 29, 2026.
