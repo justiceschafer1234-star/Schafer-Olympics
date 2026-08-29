@@ -20,7 +20,7 @@
         <div class="live-pill status" aria-live="polite"><span class="status__dot"></span><span id="status-text">Loading live data…</span></div>
       </div>
       <div class="hero__stats" id="hero-stats" aria-live="polite">
-        <div><span class="hero-stat__value" id="events-complete">–</span><span class="hero-stat__label">Results recorded</span></div>
+        <div><span class="hero-stat__value" id="events-complete">–</span><span class="hero-stat__label">Events complete</span></div>
         <div><span class="hero-stat__value" id="events-total">–</span><span class="hero-stat__label">Total events</span></div>
         <div><span class="hero-stat__value" id="points-awarded">–</span><span class="hero-stat__label">Points awarded</span></div>
         <div><span class="hero-stat__value" id="points-remaining">–</span><span class="hero-stat__label">Gold pts still available</span></div>
@@ -53,12 +53,12 @@
       </div>
 
       <section class="panel max-panel">
-        <div class="panel__header"><div><p class="section-kicker">Ceiling tracker</p><h2>Maximum Possible Points</h2></div><p class="panel-note">Current score + every still-unawarded gold point.</p></div>
+        <div class="panel__header"><div><p class="section-kicker">Ceiling tracker</p><h2>Maximum Possible Points</h2></div><p class="panel-note">Current score + every gold point from events not marked complete.</p></div>
         <div id="max-points-grid" class="max-points-grid"></div>
       </section>
 
       <section class="panel progress-panel">
-        <div class="panel__header"><div><p class="section-kicker">Tournament progress</p><h2>How Far We’ve Come</h2><p class="panel-note progress-note">An event counts as finished once a gold result is entered, even if its Notion status was missed.</p></div><span id="progress-label" class="big-percent">0%</span></div>
+        <div class="panel__header"><div><p class="section-kicker">Tournament progress</p><h2>How Far We’ve Come</h2><p class="panel-note progress-note">Only events marked Complete in Notion count toward tournament progress.</p></div><span id="progress-label" class="big-percent">0%</span></div>
         <div class="progress-track"><div id="progress-fill" class="progress-fill"></div></div>
         <div id="status-breakdown" class="status-breakdown"></div>
       </section>
@@ -91,16 +91,17 @@
 
     <section class="tab-panel" data-panel="admin" hidden>
       <section class="panel admin-panel">
-        <div class="panel__header"><div><p class="section-kicker">Scorekeeper only</p><h2>Enter Event Results</h2></div><p class="panel-note">Saving here updates the official Notion database immediately.</p></div>
+        <div class="panel__header"><div><p class="section-kicker">Scorekeeper only</p><h2>Enter Event Results</h2></div><p class="panel-note">You can also reopen an event by changing its status away from Complete.</p></div>
         <form id="score-form" class="score-form">
           <label class="field field--wide"><span>Event</span><select id="admin-event" required><option value="">Choose an event…</option></select></label>
           <label class="field"><span>🥇 Gold</span><select id="admin-gold" required></select></label>
           <label class="field"><span>🥈 Silver</span><select id="admin-silver" required></select></label>
           <label class="field"><span>🥉 Bronze 1</span><select id="admin-bronze-1"></select></label>
           <label class="field"><span>🥉 Bronze 2</span><select id="admin-bronze-2"></select></label>
+          <label class="field field--wide"><span>Event status</span><select id="admin-status"><option value="Not Started">Not Started</option><option value="In Progress">In Progress</option><option value="Delayed">Delayed</option><option value="Complete">Complete</option></select></label>
           <label class="field field--wide"><span>Private score-entry code</span><input id="admin-code" type="password" autocomplete="off" inputmode="numeric" placeholder="Enter code" required /></label>
           <div id="admin-preview" class="admin-preview">Pick an event to enter or edit its result.</div>
-          <div class="admin-actions"><button id="save-score" class="save-score" type="submit">Save Result to Notion</button><span id="admin-message" class="admin-message" aria-live="polite"></span></div>
+          <div class="admin-actions"><button id="save-score" class="save-score" type="submit">Save Result &amp; Status</button><span id="admin-message" class="admin-message" aria-live="polite"></span></div>
         </form>
       </section>
     </section>
@@ -109,5 +110,6 @@
   </main>
 
   <script src="/app.js" defer></script>
+  <script src="/admin-status.js" defer></script>
 </body>
 </html>
