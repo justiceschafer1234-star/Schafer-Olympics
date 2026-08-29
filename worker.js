@@ -1,5 +1,6 @@
 const NOTION_VERSION = "2026-03-11";
 const DEFAULT_DATA_SOURCE_ID = "1bffd4df-3de3-4e8e-9c13-cbcb1e30e226";
+const TEAMS = ["Team Red", "Team Blue", "Team Green", "Team Gold"];
 
 const TEAM_SCORE_FIELDS = [
   { team: "Team Red", field: "🔴 Red Points" },
@@ -11,6 +12,7 @@ const TEAM_SCORE_FIELDS = [
 function json(data, init = {}) {
   const headers = new Headers(init.headers || {});
   headers.set("Content-Type", "application/json; charset=utf-8");
+  headers.set("Cache-Control", headers.get("Cache-Control") || "no-store");
   return new Response(JSON.stringify(data), { ...init, headers });
 }
 
@@ -85,11 +87,33 @@ function numberValue(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function resultRecorded(row) {
+  const p = row.properties || {};
+  return Boolean(p["🥇 Team"]) || p.Status === "Complete";
+}
+
 function buildStandings(rows) {
   return TEAM_SCORE_FIELDS.map(({ team, field }) => ({
     team,
     points: rows.reduce((total, row) => total + numberValue(row.properties?.[field]), 0),
   })).sort((a, b) => b.points - a.points || a.team.localeCompare(b.team));
+}
+
+function buildRaceInfo(rows, standings) {
+  const remainingGoldPoints = rows
+    .filter((row) => !resultRecorded(row))
+    .reduce((sum, row) => sum + numberValue(row.properties?.["🥇 Gold Points"]), 0);
+
+  return {
+    completedEvents: rows.filter(resultRecorded).length,
+    totalEvents: rows.length,
+    remainingGoldPoints,
+    maximumPossible: standings.map((team) => ({
+      team: team.team,
+      currentPoints: team.points,
+      maximumPoints: team.points + remainingGoldPoints,
+    })),
+  };
 }
 
 async function queryAll(token, dataSourceId) {
@@ -140,41 +164,28 @@ async function scoresResponse(env) {
   const dataSourceId = normalizeDataSourceId(env.NOTION_DATA_SOURCE_ID);
 
   if (!token) {
-    return json(
-      {
-        configured: false,
-        error: "NOTION_API_TOKEN is missing in Cloudflare.",
-      },
-      { status: 503, headers: { "Cache-Control": "no-store" } }
-    );
+    return json({ configured: false, error: "NOTION_API_TOKEN is missing in Cloudflare." }, { status: 503 });
   }
 
   try {
     const pages = await queryAll(token, dataSourceId);
     const rows = pages.map(normalizePage);
     const standings = buildStandings(rows);
+    const race = buildRaceInfo(rows, standings);
 
     return json(
       {
         configured: true,
         standings,
+        race,
         rows,
         dataSourceId,
         updatedAt: new Date().toISOString(),
       },
-      {
-        headers: {
-          "Cache-Control": "public, max-age=30, s-maxage=30, stale-while-revalidate=120",
-        },
-      }
+      { headers: { "Cache-Control": "public, max-age=15, s-maxage=15, stale-while-revalidate=30" } }
     );
   } catch (error) {
-    console.error("Notion query failed", {
-      status: error?.status,
-      code: error?.code,
-      message: error?.message,
-    });
-
+    console.error("Notion query failed", { status: error?.status, code: error?.code, message: error?.message });
     return json(
       {
         configured: true,
@@ -184,9 +195,84 @@ async function scoresResponse(env) {
         notionMessage: error?.message ?? "Unknown Notion error",
         dataSourceId,
       },
-      { status: 502, headers: { "Cache-Control": "no-store" } }
+      { status: 502 }
     );
   }
+}
+
+function validTeam(value) {
+  return TEAMS.includes(value);
+}
+
+async function updateScore(request, env) {
+  if (!env.NOTION_API_TOKEN) {
+    return json({ error: "Notion is not configured." }, { status: 503 });
+  }
+
+  if (!env.ADMIN_SCORE_CODE) {
+    return json({ error: "Score entry is not enabled yet. Add ADMIN_SCORE_CODE in Cloudflare runtime secrets." }, { status: 503 });
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid request." }, { status: 400 });
+  }
+
+  if (String(body.code || "") !== String(env.ADMIN_SCORE_CODE)) {
+    return json({ error: "Incorrect score-entry code." }, { status: 401 });
+  }
+
+  const eventId = String(body.eventId || "").trim();
+  const goldTeam = body.goldTeam;
+  const silverTeam = body.silverTeam;
+  const bronzeTeams = Array.isArray(body.bronzeTeams) ? body.bronzeTeams.filter(Boolean) : [];
+
+  if (!eventId || !validTeam(goldTeam) || !validTeam(silverTeam)) {
+    return json({ error: "Choose an event, gold team, and silver team." }, { status: 400 });
+  }
+
+  if (bronzeTeams.length > 2 || bronzeTeams.some((team) => !validTeam(team))) {
+    return json({ error: "Bronze teams are invalid." }, { status: 400 });
+  }
+
+  const placements = [goldTeam, silverTeam, ...bronzeTeams];
+  if (new Set(placements).size !== placements.length) {
+    return json({ error: "A team cannot occupy more than one finishing position." }, { status: 400 });
+  }
+
+  const notionResponse = await fetch(`https://api.notion.com/v1/pages/${encodeURIComponent(eventId)}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${env.NOTION_API_TOKEN}`,
+      "Notion-Version": NOTION_VERSION,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      properties: {
+        "🥇 Team": { select: { name: goldTeam } },
+        "🥈 Team": { select: { name: silverTeam } },
+        "🥉 Team": { multi_select: bronzeTeams.map((name) => ({ name })) },
+        Status: { status: { name: "Complete" } },
+      },
+    }),
+  });
+
+  const notionData = await notionResponse.json();
+  if (!notionResponse.ok) {
+    return json(
+      {
+        error: "Notion rejected the score update.",
+        notionStatus: notionResponse.status,
+        notionCode: notionData.code || null,
+        notionMessage: notionData.message || null,
+      },
+      { status: 502 }
+    );
+  }
+
+  return json({ ok: true, eventId, message: "Score saved to Notion." });
 }
 
 export default {
@@ -200,10 +286,18 @@ export default {
       return scoresResponse(env);
     }
 
-    if (env.ASSETS) {
-      return env.ASSETS.fetch(request);
+    if (url.pathname === "/api/admin/scores") {
+      if (request.method !== "POST") {
+        return json({ error: "Method not allowed" }, { status: 405, headers: { Allow: "POST" } });
+      }
+      return updateScore(request, env);
     }
 
+    if (url.pathname.startsWith("/api/")) {
+      return json({ error: "Not found" }, { status: 404 });
+    }
+
+    if (env.ASSETS) return env.ASSETS.fetch(request);
     return new Response("Not found", { status: 404 });
   },
 };
