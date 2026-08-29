@@ -5,45 +5,17 @@ const updatedAt = document.querySelector("#updated-at");
 const refreshButton = document.querySelector("#refresh-button");
 const setupMessage = document.querySelector("#setup-message");
 
-function findProperty(properties, candidates) {
-  const entries = Object.entries(properties || {});
-  for (const candidate of candidates) {
-    const match = entries.find(([name]) => name.toLowerCase() === candidate.toLowerCase());
-    if (match) return match[1];
-  }
-  return null;
-}
-
-function inferTeam(properties) {
-  const preferred = findProperty(properties, ["Team", "Team Name", "Name"]);
-  if (preferred !== null && preferred !== "") return String(preferred);
-
-  const firstText = Object.values(properties || {}).find(
-    (value) => typeof value === "string" && value.trim()
+function renderRows(standings) {
+  const sorted = [...standings].sort(
+    (a, b) => Number(b.points || 0) - Number(a.points || 0) || String(a.team).localeCompare(String(b.team))
   );
-  return firstText || "Unnamed Team";
-}
 
-function inferPoints(properties) {
-  const preferred = findProperty(properties, ["Points", "Total Points", "Score", "Total"]);
-  if (typeof preferred === "number") return preferred;
-  if (preferred !== null && preferred !== "" && !Number.isNaN(Number(preferred))) return Number(preferred);
-
-  const firstNumber = Object.values(properties || {}).find((value) => typeof value === "number");
-  return typeof firstNumber === "number" ? firstNumber : 0;
-}
-
-function renderRows(rows) {
-  const standings = rows
-    .map((row) => ({ team: inferTeam(row.properties), points: inferPoints(row.properties) }))
-    .sort((a, b) => b.points - a.points || a.team.localeCompare(b.team));
-
-  if (!standings.length) {
+  if (!sorted.length) {
     body.innerHTML = '<tr class="empty-row"><td colspan="3">No teams found yet.</td></tr>';
     return;
   }
 
-  body.innerHTML = standings
+  body.innerHTML = sorted
     .map(
       (team, index) => `
         <tr>
@@ -65,7 +37,7 @@ function escapeHtml(value) {
 }
 
 function formatPoints(value) {
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(Number(value) || 0);
 }
 
 async function loadScores() {
@@ -87,9 +59,12 @@ async function loadScores() {
       return;
     }
 
-    if (!response.ok || data.error) throw new Error(data.error || "Unable to load scores");
+    if (!response.ok || data.error) {
+      const detail = [data.notionCode, data.notionMessage].filter(Boolean).join(": ");
+      throw new Error(detail || data.error || "Unable to load scores");
+    }
 
-    renderRows(data.rows || []);
+    renderRows(data.standings || []);
     statusText.textContent = "Live from Notion";
     updatedAt.textContent = data.updatedAt
       ? `Last checked ${new Date(data.updatedAt).toLocaleString()}`
@@ -99,6 +74,7 @@ async function loadScores() {
     body.innerHTML = '<tr class="empty-row"><td colspan="3">Scores are temporarily unavailable.</td></tr>';
     status.classList.add("error");
     statusText.textContent = "Connection error";
+    updatedAt.textContent = error?.message ? `API: ${error.message}` : "";
   } finally {
     refreshButton.disabled = false;
   }
