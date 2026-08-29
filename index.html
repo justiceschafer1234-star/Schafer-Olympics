@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b1020" />
+  <title>Schafer Olympics | Scoreboard</title>
+  <meta name="description" content="Live Schafer Olympics standings and scores." />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__content">
+      <p class="eyebrow">Schafer Olympics</p>
+      <h1>Live Scoreboard</h1>
+      <p class="subtitle">Standings update from the official event results.</p>
+      <div class="status" aria-live="polite">
+        <span class="status__dot"></span>
+        <span id="status-text">Loading scores…</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="panel" aria-labelledby="standings-title">
+      <div class="panel__header">
+        <div>
+          <p class="section-kicker">Overall</p>
+          <h2 id="standings-title">Standings</h2>
+        </div>
+        <button id="refresh-button" class="refresh" type="button">Refresh</button>
+      </div>
+
+      <div id="setup-message" class="setup-message" hidden>
+        <strong>Scoreboard is ready for Notion.</strong>
+        <span>Add the Cloudflare secrets described in the README to connect your table.</span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Place</th>
+              <th scope="col">Team</th>
+              <th scope="col" class="number">Points</th>
+            </tr>
+          </thead>
+          <tbody id="standings-body">
+            <tr class="loading-row"><td colspan="3">Loading standings…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <p class="updated" id="updated-at"></p>
+  </main>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>
