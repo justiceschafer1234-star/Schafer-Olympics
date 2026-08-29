@@ -1,4 +1,5 @@
 const NOTION_VERSION = "2026-03-11";
+const DEFAULT_DATA_SOURCE_ID = "1bffd4df-3de3-4e8e-9c13-cbcb1e30e226";
 
 function plainText(parts = []) {
   return parts.map((part) => part?.plain_text ?? part?.text?.content ?? "").join("");
@@ -60,6 +61,11 @@ function normalizePage(page) {
   };
 }
 
+function normalizeDataSourceId(value) {
+  if (!value) return DEFAULT_DATA_SOURCE_ID;
+  return String(value).trim().replace(/^collection:\/\//i, "");
+}
+
 async function queryAll(token, dataSourceId) {
   const results = [];
   let startCursor;
@@ -82,9 +88,17 @@ async function queryAll(token, dataSourceId) {
     );
 
     if (!response.ok) {
-      const detail = await response.text();
-      console.error("Notion API error", response.status, detail);
-      throw new Error(`Notion returned ${response.status}`);
+      let notionError = {};
+      try {
+        notionError = await response.json();
+      } catch {
+        notionError = { message: await response.text() };
+      }
+
+      const error = new Error(notionError.message || `Notion returned ${response.status}`);
+      error.status = response.status;
+      error.code = notionError.code || null;
+      throw error;
     }
 
     const data = await response.json();
@@ -97,13 +111,13 @@ async function queryAll(token, dataSourceId) {
 
 export async function onRequestGet(context) {
   const token = context.env.NOTION_API_TOKEN;
-  const dataSourceId = context.env.NOTION_DATA_SOURCE_ID;
+  const dataSourceId = normalizeDataSourceId(context.env.NOTION_DATA_SOURCE_ID);
 
-  if (!token || !dataSourceId) {
+  if (!token) {
     return Response.json(
       {
         configured: false,
-        error: "Notion is not configured yet.",
+        error: "NOTION_API_TOKEN is missing in Cloudflare.",
       },
       {
         status: 503,
@@ -120,6 +134,7 @@ export async function onRequestGet(context) {
       {
         configured: true,
         rows,
+        dataSourceId,
         updatedAt: new Date().toISOString(),
       },
       {
@@ -130,11 +145,20 @@ export async function onRequestGet(context) {
       }
     );
   } catch (error) {
-    console.error(error);
+    console.error("Notion query failed", {
+      status: error?.status,
+      code: error?.code,
+      message: error?.message,
+    });
+
     return Response.json(
       {
         configured: true,
         error: "Unable to load scoreboard data.",
+        notionStatus: error?.status ?? null,
+        notionCode: error?.code ?? null,
+        notionMessage: error?.message ?? "Unknown Notion error",
+        dataSourceId,
       },
       {
         status: 502,
