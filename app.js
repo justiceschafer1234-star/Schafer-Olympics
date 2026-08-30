@@ -85,11 +85,23 @@ function renderStandings(standings) {
   const sorted = [...standings].sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
   if (!sorted.length) {
     standingsCards.innerHTML = '<div class="empty-state">No standings available yet.</div>';
+    leaderBanner.className = 'leader-banner';
+    leaderBanner.innerHTML = '<div><div class="leader-banner__label">No leader yet</div><div class="leader-banner__team">Waiting for results</div></div>';
     return;
   }
+
   const leader = Number(sorted[0].points || 0);
+  const leaders = sorted.filter((team) => Number(team.points || 0) === leader);
+  const hasPoints = leader > 0;
+  const hasUniqueLeader = hasPoints && leaders.length === 1;
+
   standingsCards.innerHTML = sorted.map((team, i) => {
-    const gap = i === 0 ? 'Current leader' : `${fmt(leader - Number(team.points || 0))} pts behind`;
+    const points = Number(team.points || 0);
+    let gap;
+    if (!hasPoints) gap = 'No points yet';
+    else if (points === leader && leaders.length > 1) gap = 'Tied for lead';
+    else if (i === 0 && hasUniqueLeader) gap = 'Current leader';
+    else gap = `${fmt(leader - points)} pts behind`;
     return `<div class="standing-card ${teamSlug(team.team)}">
       <div class="rank-badge">${medalEmoji[i] || i + 1}</div>
       <div><div class="team-name">${esc(team.team)}</div><div class="team-gap">${gap}</div></div>
@@ -97,8 +109,16 @@ function renderStandings(standings) {
     </div>`;
   }).join('');
 
-  leaderBanner.className = `leader-banner ${teamSlug(sorted[0].team)}`;
-  leaderBanner.innerHTML = `<div><div class="leader-banner__label">🔥 Currently leading</div><div class="leader-banner__team">${esc(sorted[0].team)}</div></div><div class="leader-banner__points"><strong>${fmt(sorted[0].points)}</strong><span>points</span></div>`;
+  if (!hasPoints) {
+    leaderBanner.className = 'leader-banner';
+    leaderBanner.innerHTML = '<div><div class="leader-banner__label">🏁 No leader yet</div><div class="leader-banner__team">Waiting for the first points</div></div><div class="leader-banner__points"><strong>0</strong><span>points</span></div>';
+  } else if (hasUniqueLeader) {
+    leaderBanner.className = `leader-banner ${teamSlug(sorted[0].team)}`;
+    leaderBanner.innerHTML = `<div><div class="leader-banner__label">🔥 Currently leading</div><div class="leader-banner__team">${esc(sorted[0].team)}</div></div><div class="leader-banner__points"><strong>${fmt(sorted[0].points)}</strong><span>points</span></div>`;
+  } else {
+    leaderBanner.className = 'leader-banner';
+    leaderBanner.innerHTML = `<div><div class="leader-banner__label">🤝 Tied for the lead</div><div class="leader-banner__team">${leaders.map((team) => esc(team.team)).join(' · ')}</div></div><div class="leader-banner__points"><strong>${fmt(leader)}</strong><span>points each</span></div>`;
+  }
 }
 
 function renderBarChart(container, values, valueKey) {
