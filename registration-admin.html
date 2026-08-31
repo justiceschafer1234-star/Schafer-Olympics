@@ -1,4 +1,117 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Schafer Olympics — Registration Dashboard</title><link rel="stylesheet" href="registration-admin.css"></head><body>
-<section id="login-gate" class="login-gate"><form id="login-form" class="login-card"><p class="eyebrow">Schafer Olympics 2026</p><h1>Organizer Dashboard</h1><p class="subhead">Enter the organizer password to view registration information.</p><label for="dashboard-password">Password</label><input id="dashboard-password" type="password" required autofocus><button class="primary-button" type="submit">Open dashboard</button><p id="login-error" class="login-error" aria-live="polite"></p></form></section>
-<main id="dashboard-content" class="dashboard-shell" hidden><header class="dashboard-header"><div><p class="eyebrow">Schafer Olympics 2026</p><h1>Registration Dashboard</h1><p class="subhead">Live registration totals, participant details, and event demand.</p></div><button id="refresh-dashboard" class="secondary-button" type="button">Refresh</button></header><section id="status-message" class="status-message" aria-live="polite">Loading registration data…</section><section class="stats-grid" aria-label="Registration summary"><article class="stat-card"><span>Total participants</span><strong id="stat-total">—</strong></article><article class="stat-card"><span>Registered</span><strong id="stat-registered">—</strong></article><article class="stat-card"><span>Not registered</span><strong id="stat-unregistered">—</strong></article><article class="stat-card"><span>Total event entries</span><strong id="stat-entries">—</strong></article><article class="stat-card"><span>Avg. events / registered person</span><strong id="stat-average">—</strong></article></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Breakdown</p><h2>Participants by division</h2></div></div><div id="division-summary" class="division-grid"></div></section><section class="panel"><div class="panel-heading responsive-heading"><div><p class="eyebrow">Roster</p><h2>Participant registration</h2></div><div class="controls"><input id="participant-search" type="search" placeholder="Search participant…"><select id="registration-filter"><option value="all">All participants</option><option value="registered">Registered</option><option value="unregistered">Not registered</option></select><select id="division-filter"><option value="all">All divisions</option></select></div></div><div class="table-wrap"><table><thead><tr><th>Participant</th><th>Division</th><th>Status</th><th>Events</th><th>Registered events</th></tr></thead><tbody id="participant-rows"></tbody></table></div><p id="participant-count" class="table-note"></p></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Demand</p><h2>Event registration totals</h2></div></div><div id="event-summary" class="event-list"></div></section></main><script src="registration-admin.js" defer></script><script src="registration-admin-auth.js" defer></script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Schafer Olympics — Organizer Dashboard</title>
+  <link rel="stylesheet" href="registration-admin.css">
+</head>
+<body>
+  <section id="login-gate" class="login-gate">
+    <form id="login-form" class="login-card">
+      <div class="brand-mark">SO</div>
+      <p class="eyebrow">Schafer Olympics 2026</p>
+      <h1>Organizer Dashboard</h1>
+      <p class="subhead">Enter the organizer password to view registration information.</p>
+      <label for="dashboard-password">Password</label>
+      <input id="dashboard-password" type="password" required autofocus>
+      <button class="primary-button" type="submit">Open dashboard</button>
+      <p id="login-error" class="login-error" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <main id="dashboard-content" class="dashboard-shell" hidden>
+    <header class="dashboard-header">
+      <div class="brand-row">
+        <div class="brand-mark small">SO</div>
+        <div>
+          <p class="eyebrow">Schafer Olympics 2026</p>
+          <h1>Organizer Dashboard</h1>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span id="last-updated" class="last-updated">Live registration data</span>
+        <button id="refresh-dashboard" class="secondary-button" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <nav class="tab-bar" aria-label="Dashboard sections">
+      <button class="tab-button is-active" type="button" data-tab="overview">Overview</button>
+      <button class="tab-button" type="button" data-tab="events">Events</button>
+      <button class="tab-button" type="button" data-tab="participants">Participants</button>
+      <button class="tab-button" type="button" data-tab="registration">Registration</button>
+    </nav>
+
+    <section id="status-message" class="status-message" aria-live="polite">Loading registration data…</section>
+
+    <section class="tab-panel is-active" data-panel="overview">
+      <div class="section-heading">
+        <div><p class="eyebrow">At a glance</p><h2>Registration overview</h2></div>
+        <p class="section-copy">A quick snapshot of participation across Schafer Olympics.</p>
+      </div>
+      <section class="stats-grid" aria-label="Registration summary">
+        <article class="stat-card featured"><span>Total participants</span><strong id="stat-total">—</strong><small>Invited participants</small></article>
+        <article class="stat-card"><span>Registered</span><strong id="stat-registered">—</strong><small>With at least one event</small></article>
+        <article class="stat-card"><span>Not registered</span><strong id="stat-unregistered">—</strong><small>Still need selections</small></article>
+        <article class="stat-card"><span>Event entries</span><strong id="stat-entries">—</strong><small>Total selections</small></article>
+        <article class="stat-card"><span>Average events</span><strong id="stat-average">—</strong><small>Per registered person</small></article>
+      </section>
+      <section class="overview-grid">
+        <article class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">Divisions</p><h2>Participants by division</h2></div></div>
+          <div id="division-summary" class="division-grid"></div>
+        </article>
+        <article class="panel progress-panel">
+          <div class="panel-heading"><div><p class="eyebrow">Completion</p><h2>Registration progress</h2></div></div>
+          <div class="progress-ring-wrap">
+            <div id="registration-ring" class="progress-ring"><span id="registration-percent">—</span></div>
+            <div><strong id="registration-progress-label">Loading…</strong><p class="muted">Participants who have chosen at least one event.</p></div>
+          </div>
+        </article>
+      </section>
+    </section>
+
+    <section class="tab-panel" data-panel="events" hidden>
+      <div class="section-heading">
+        <div><p class="eyebrow">Event demand</p><h2>Events</h2></div>
+        <p class="section-copy">See which events are attracting the most registrations.</p>
+      </div>
+      <article class="panel flush-panel"><div id="event-summary" class="event-list"></div></article>
+    </section>
+
+    <section class="tab-panel" data-panel="participants" hidden>
+      <div class="section-heading">
+        <div><p class="eyebrow">Roster</p><h2>Participants</h2></div>
+        <p class="section-copy">Search the full roster and review each participant’s selections.</p>
+      </div>
+      <article class="panel flush-panel">
+        <div class="toolbar">
+          <input id="participant-search" type="search" placeholder="Search participant…">
+          <select id="registration-filter"><option value="all">All statuses</option><option value="registered">Registered</option><option value="unregistered">Not registered</option></select>
+          <select id="division-filter"><option value="all">All divisions</option></select>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Participant</th><th>Division</th><th>Status</th><th>Events</th><th>Registered events</th></tr></thead><tbody id="participant-rows"></tbody></table></div>
+        <p id="participant-count" class="table-note"></p>
+      </article>
+    </section>
+
+    <section class="tab-panel" data-panel="registration" hidden>
+      <div class="section-heading">
+        <div><p class="eyebrow">Follow-up</p><h2>Registration</h2></div>
+        <p class="section-copy">Focus on who is finished and who still needs to register.</p>
+      </div>
+      <section class="registration-summary-grid">
+        <article class="status-card success"><span>Complete</span><strong id="registration-complete-count">—</strong><small>Participants registered</small></article>
+        <article class="status-card pending"><span>Needs registration</span><strong id="registration-pending-count">—</strong><small>Participants remaining</small></article>
+      </section>
+      <section class="registration-columns">
+        <article class="panel"><div class="panel-heading"><div><p class="eyebrow">Needs attention</p><h2>Not registered</h2></div></div><div id="unregistered-list" class="person-list"></div></article>
+        <article class="panel"><div class="panel-heading"><div><p class="eyebrow">Completed</p><h2>Registered participants</h2></div></div><div id="registered-list" class="person-list"></div></article>
+      </section>
+    </section>
+  </main>
+
+  <script src="registration-admin.js" defer></script>
+  <script src="registration-admin-auth.js" defer></script>
+</body>
+</html>
