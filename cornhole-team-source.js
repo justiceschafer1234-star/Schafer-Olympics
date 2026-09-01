@@ -9,10 +9,10 @@ function renderTeamList(){
  const tc=document.querySelector('#team-count'),rc=document.querySelector('#registered-count');if(tc)tc.textContent=String(teams.length);if(rc)rc.textContent=String(teams.reduce((n,t)=>n+(t.player1?1:0)+(t.player2?1:0),0));
 }
 function fixSeededLabels(root=document){
- root.querySelectorAll('.slot').forEach(slot=>{const small=slot.querySelector('small'),b=slot.querySelector('b');if(!small||!b)return;const seed=seedFrom(small.textContent.trim());if(!seed)return;const t=bySeed(seed);if(!t)return;b.textContent=t.players;small.textContent=`Seed ${seed} · ${t.olympicTeam}`});
- root.querySelectorAll('.score-sheet__teams>div').forEach(box=>{const small=box.querySelector('small'),strong=box.querySelector('strong');if(!small||!strong)return;const seed=seedFrom(small.textContent.trim());if(!seed)return;const t=bySeed(seed);if(!t)return;strong.textContent=t.players;small.textContent=`Seed ${seed} · ${t.olympicTeam}`});
+ root.querySelectorAll?.('.slot').forEach(slot=>{const small=slot.querySelector('small'),b=slot.querySelector('b');if(!small||!b)return;const raw=small.textContent.trim().split(' · ')[0],seed=seedFrom(raw);if(!seed)return;const t=bySeed(seed);if(!t)return;if(b.textContent!==t.players)b.textContent=t.players;const label=`Seed ${seed} · ${t.olympicTeam}`;if(small.textContent!==label)small.textContent=label});
+ root.querySelectorAll?.('.score-sheet__teams>div').forEach(box=>{const small=box.querySelector('small'),strong=box.querySelector('strong');if(!small||!strong)return;const raw=small.textContent.trim().split(' · ')[0],seed=seedFrom(raw);if(!seed)return;const t=bySeed(seed);if(!t)return;if(strong.textContent!==t.players)strong.textContent=t.players;const label=`Seed ${seed} · ${t.olympicTeam}`;if(small.textContent!==label)small.textContent=label});
 }
 async function load(){try{const r=await fetch('/api/cornhole/teams',{cache:'no-store'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load Cornhole teams');teams=d.teams||[];renderTeamList();fixSeededLabels()}catch(e){console.error('Cornhole team source:',e)}}
-const obs=new MutationObserver(()=>{renderTeamList();fixSeededLabels()});obs.observe(document.body,{childList:true,subtree:true});
+const obs=new MutationObserver(records=>{for(const rec of records){for(const node of rec.addedNodes){if(node.nodeType===1)fixSeededLabels(node)}}});obs.observe(document.body,{childList:true,subtree:true});
 load();
 })();
