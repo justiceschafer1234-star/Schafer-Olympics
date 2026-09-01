@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "schafer-olympics",
   "compatibility_date": "2026-08-29",
-  "main": "./worker-fast-cornhole.js",
+  "main": "./worker-fast-wiffle.js",
   "secrets": {
     "required": [
       "SUPABASE_URL",
