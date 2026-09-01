@@ -98,9 +98,25 @@ async function teamEditor(request,env){
         seen.add(person.id);
         resolved.push({person,team});
       }
-      await Promise.all(resolved.map(({person,team})=>sb(env,`participants?id=eq.${encodeURIComponent(person.id)}`,{
-        method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({team:team||null})
-      })));
+
+      // Batch by destination team instead of sending one PATCH per participant.
+      // This keeps a save to at most five Supabase PATCH requests (4 teams + unassigned),
+      // which stays comfortably under Cloudflare's Worker subrequest limits.
+      const groups=new Map();
+      for(const item of resolved){
+        const groupKey=item.team||'';
+        if(!groups.has(groupKey))groups.set(groupKey,[]);
+        groups.get(groupKey).push(item.person.id);
+      }
+      for(const [team,ids] of groups){
+        if(!ids.length)continue;
+        const filter=ids.map(id=>encodeURIComponent(id)).join(',');
+        await sb(env,`participants?id=in.(${filter})`,{
+          method:'PATCH',
+          headers:{Prefer:'return=minimal'},
+          body:JSON.stringify({team:team||null})
+        });
+      }
       return json({ok:true,saved:resolved.length});
     }
 
