@@ -8,12 +8,14 @@
   let scoreData=null;
   let detail=null;
   let openRow=null;
-  const TOURNAMENT_ASSET_VERSION='2026-09-01-10team';
+  const TOURNAMENT_ASSET_VERSION='2026-09-01-10team-v2';
 
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const teamClass={'Team Red':'team-red','Team Blue':'team-blue','Team Green':'team-green','Team Gold':'team-gold'};
+  const teamShort=t=>String(t||'').replace('Team ','');
   const tournamentPath=name=>{const n=String(name||'').toLowerCase();if(n.includes('cornhole'))return'/cornhole-tournament.html';if(n.includes('adult soccer'))return'/adult-soccer-tournament.html';if(n.includes('wiffle ball'))return'/wiffle-ball-tournament.html';return''};
   const tournamentSrc=path=>`${path}?${document.body.classList.contains('control-mode')?'control=1':'view=1'}&v=${encodeURIComponent(TOURNAMENT_ASSET_VERSION)}`;
+  const isTeamEvent=p=>/team/i.test(String(p?.Format||''));
   const podium=p=>{const bits=[];const gold=Array.isArray(p['🥇 Team'])?p['🥇 Team'][0]:p['🥇 Team'];const silver=Array.isArray(p['🥈 Team'])?p['🥈 Team'][0]:p['🥈 Team'];const bronze=Array.isArray(p['🥉 Team'])?p['🥉 Team']:p['🥉 Team']?[p['🥉 Team']]:[];if(gold)bits.push(`🥇 ${esc(String(gold).replace('Team ',''))}`);if(silver)bits.push(`🥈 ${esc(String(silver).replace('Team ',''))}`);if(bronze.length)bits.push(`🥉 ${bronze.map(x=>esc(String(x).replace('Team ',''))).join(' + ')}`);return bits.join('<span>•</span>')};
 
   async function getScores(force=false){
@@ -29,7 +31,7 @@
     detail.id='gameday-event-detail';
     detail.className='gameday-event-detail';
     detail.hidden=true;
-    detail.innerHTML=`<button class="gameday-event-back" type="button">← All Events</button><div class="gameday-event-head"><div><p class="section-kicker">Event Control</p><h2 data-detail-title></h2><div class="gameday-event-tags" data-detail-tags></div></div><span data-detail-status class="status-badge"></span></div><div data-detail-result></div><div data-detail-action></div><div data-detail-tournament hidden></div><section class="gameday-mini-board"><div class="panel__header"><div><p class="section-kicker">Live overall race</p><h3>Leaderboard</h3></div></div><div data-detail-board></div></section>`;
+    detail.innerHTML=`<button class="gameday-event-back" type="button">← All Events</button><div class="gameday-event-head"><div><p class="section-kicker">Event Control</p><h2 data-detail-title></h2><div class="gameday-event-tags" data-detail-tags></div></div><span data-detail-status class="status-badge"></span></div><div data-detail-result></div><div data-detail-action></div><div data-detail-tournament hidden></div><section class="gameday-mini-board"><div class="panel__header"><div><p class="section-kicker">Live overall race</p><h3>Leaderboard</h3></div></div><div data-detail-board></div></section><section data-detail-rosters class="gameday-event-rosters" hidden></section>`;
     grid.parentElement.appendChild(detail);
     detail.querySelector('.gameday-event-back').addEventListener('click',closeDetail);
     return detail;
@@ -38,6 +40,19 @@
   function compactBoard(container,standings=[]){
     const sorted=[...standings].sort((a,b)=>Number(b.points||0)-Number(a.points||0));
     container.innerHTML=sorted.map((t,i)=>`<div class="gameday-mini-row ${teamClass[t.team]||''}"><strong>${i+1}. ${esc(t.team)}</strong><span>${Number(t.points||0)} pts</span></div>`).join('')||'<div class="empty-state">No standings yet.</div>';
+  }
+
+  async function renderEventRosters(box,row){
+    const host=box.querySelector('[data-detail-rosters]'),p=row.properties||{};
+    if(!host)return;
+    if(!isTeamEvent(p)){host.hidden=true;host.innerHTML='';return}
+    host.hidden=false;
+    host.innerHTML='<div class="panel__header"><div><p class="section-kicker">Registered for this event</p><h3>Team Participants</h3></div></div><div class="event-roster-loading">Loading registered players…</div>';
+    try{
+      const r=await fetch(`/api/event-rosters?eventId=${encodeURIComponent(row.id)}`,{cache:'no-store'}),d=await r.json();
+      if(!r.ok||d.error)throw new Error(d.error||'Could not load event participants');
+      host.innerHTML=`<div class="panel__header"><div><p class="section-kicker">Registered for this event</p><h3>Team Participants</h3></div><strong class="event-roster-total">${Number(d.registeredCount||0)} registered</strong></div><div class="event-roster-grid">${(d.rosters||[]).map(x=>`<article class="event-roster-card ${teamClass[x.team]||''}"><h4>${esc(teamShort(x.team))} Team</h4>${x.participants?.length?`<div class="event-roster-names">${x.participants.map(name=>`<span>${esc(name)}</span>`).join('')}</div>`:'<p>No registered participants.</p>'}</article>`).join('')}</div>${d.unassigned?.length?`<div class="event-roster-unassigned"><strong>Registered but not assigned to an Olympic team:</strong> ${d.unassigned.map(esc).join(', ')}</div>`:''}`;
+    }catch(e){host.innerHTML=`<div class="panel__header"><div><p class="section-kicker">Registered for this event</p><h3>Team Participants</h3></div></div><div class="event-roster-error">${esc(e.message||'Could not load participants.')}</div>`}
   }
 
   function closeDetail(){
@@ -82,6 +97,7 @@
         }else action.innerHTML='';
       }
       compactBoard(box.querySelector('[data-detail-board]'),d.standings||[]);
+      renderEventRosters(box,row);
       box.scrollIntoView({behavior:'smooth',block:'start'});
     }catch(e){alert(e.message||'Could not open event')}
   }
