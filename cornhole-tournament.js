@@ -2,7 +2,7 @@
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const control=new URLSearchParams(location.search).get('control')==='1';
-const teamGrid=$('#team-grid'),wb=$('#winners-bracket'),lb=$('#losers-bracket'),finals=$('#finals-grid'),now=$('#tournament-now');
+const seedList=$('#seed-list'),wb=$('#winners-bracket'),lb=$('#losers-bracket'),finals=$('#finals-grid');
 let matches=[],teams=[];
 const teamBySeed=new Map();
 const roundNames={
@@ -33,33 +33,53 @@ function card(m){
     <div class="match-head"><strong>${esc(p.Match||'Match')}</strong><span>${clickable?'Tap to score':esc(p.Status||'Waiting')}</span></div>
     ${slot(p['Team A'],p['Team A Players'],p['Score A'],done,p.Winner,phA)}
     ${slot(p['Team B'],p['Team B Players'],p['Score B'],done,p.Winner,phB)}
-    <div class="match-path">${p['Winner To']?`<span>Winner → ${esc(p['Winner To'])}</span>`:''}${p['Loser To']?`<span>Loser → ${esc(p['Loser To'])}</span>`:''}</div>
   </article>`;
 }
 function renderRounds(host,bracket){
   const list=matches.filter(m=>m.properties?.Bracket===bracket),rounds=[...new Set(list.map(m=>Number(m.properties?.Round||0)))].filter(Boolean).sort((a,b)=>a-b);
   host.innerHTML=rounds.map(r=>{const ms=list.filter(m=>Number(m.properties?.Round)===r);return `<section class="round"><div class="round-title"><strong>${esc(roundNames[bracket]?.[r]||`Round ${r}`)}</strong><span>${ms.length} match${ms.length===1?'':'es'}</span></div>${ms.map(card).join('')}</section>`}).join('')||'<div class="loading">No bracket matches found.</div>';
 }
-function renderTeams(){
-  teams.sort((a,b)=>a.seed-b.seed);teamGrid.innerHTML=teams.length?teams.map(t=>`<article class="team-card"><span>Seed ${t.seed}</span><strong>${esc(t.players||'Unnamed pair')}</strong><small>${esc(t.olympicTeam||'')}</small></article>`).join(''):'<div class="loading error">No seeded Cornhole pairs are saved yet.</div>';
-  $('#team-count').textContent=String(teams.length);$('#registered-count').textContent=String(teams.reduce((n,t)=>n+(t.player1?1:0)+(t.player2?1:0),0));
+function renderSeeds(){
+  const ordered=[...teams].sort((a,b)=>{
+    if(a.seed!=null&&b.seed!=null)return a.seed-b.seed;
+    if(a.seed!=null)return -1;
+    if(b.seed!=null)return 1;
+    return a.pairNumber-b.pairNumber;
+  });
+  seedList.innerHTML=ordered.length?ordered.map(t=>`<article class="seed-row${t.seed==null?' unseeded':''}">
+    <div class="seed-badge"><span>Seed</span><strong>${t.seed==null?'N/A':esc(t.seed)}</strong></div>
+    <div class="seed-team"><strong>${esc(t.players||'Unnamed pair')}</strong><small>Pair ${esc(t.pairNumber)} · ${esc(t.olympicTeam||'No Olympic team')}</small></div>
+  </article>`).join(''):'<div class="loading error">No Cornhole team pairs are saved yet.</div>';
+  const seeded=teams.filter(t=>t.seed!=null).length;
+  $('#seeded-count').textContent=String(seeded);
+  $('#pair-count').textContent=String(teams.length);
 }
-function renderNow(){
-  const ready=matches.filter(m=>m.properties?.Status==='Ready'),complete=matches.filter(m=>m.properties?.Status==='Complete').length;
-  now.innerHTML=`<div><span class="now-label">GameDay status</span><strong>${ready.length?`${ready.length} match${ready.length===1?'':'es'} ready`:'Waiting for the next matchup'}</strong><small>${complete} complete · ${Math.max(matches.length-complete,0)} remaining</small></div><div class="now-ready">${ready.slice(0,4).map(m=>{const p=m.properties||{},a=canonical(p['Team A'],p['Team A Players']),b=canonical(p['Team B'],p['Team B Players']);return `<button type="button" data-open="${esc(m.id)}" ${control?'':'disabled'}>${esc(p.Match)} · ${esc(a.players||a.label)} vs ${esc(b.players||b.label)}</button>`}).join('')||'<span>No playable match yet</span>'}</div>`;
+function renderStatus(){
+  const complete=matches.filter(m=>m.properties?.Status==='Complete').length;
+  const ready=matches.filter(m=>m.properties?.Status==='Ready').length;
+  const el=$('#bracket-status');
+  if(!teams.length){el.textContent='No team pairs';return}
+  if(!teams.some(t=>t.seed!=null)){el.textContent='Waiting for seeding';return}
+  el.textContent=`${complete} complete · ${ready} ready`;
 }
-function render(){renderTeams();renderNow();renderRounds(wb,'Winners');renderRounds(lb,'Losers');const fs=matches.filter(m=>m.properties?.Bracket==='Finals').sort((a,b)=>Number(a.properties?.Round)-Number(b.properties?.Round));finals.innerHTML=fs.map(m=>`<section class="final-card"><h4>${esc(roundNames.Finals[m.properties?.Round]||m.properties?.Match)}</h4>${card(m)}</section>`).join('');bindScoring()}
+function render(){
+  renderSeeds();renderStatus();
+  renderRounds(wb,'Winners');renderRounds(lb,'Losers');
+  const fs=matches.filter(m=>m.properties?.Bracket==='Finals').sort((a,b)=>Number(a.properties?.Round)-Number(b.properties?.Round));
+  finals.innerHTML=fs.map(m=>`<section class="final-card"><h4>${esc(roundNames.Finals[m.properties?.Round]||m.properties?.Match)}</h4>${card(m)}</section>`).join('')||'<div class="loading">No championship matches found.</div>';
+  bindScoring();
+}
 function openScore(id){if(!control)return;const m=matches.find(x=>x.id===id);if(!m||m.properties?.Status!=='Ready')return;const p=m.properties,a=canonical(p['Team A'],p['Team A Players']),b=canonical(p['Team B'],p['Team B Players']),sheet=$('#score-sheet');sheet.dataset.matchId=id;$('#score-sheet-title').textContent=`${p.Match} · Enter Score`;$('#score-sheet-teams').innerHTML=`<div><strong>${esc(a.players||a.label)}</strong><small>${esc([a.label,a.olympicTeam].filter(Boolean).join(' · '))}</small></div><span>vs</span><div><strong>${esc(b.players||b.label)}</strong><small>${esc([b.label,b.olympicTeam].filter(Boolean).join(' · '))}</small></div>`;$('#score-sheet-fields').innerHTML=`<label><span>${esc(a.players||a.label)}</span><input name="a" type="number" min="0" required></label><label><span>${esc(b.players||b.label)}</span><input name="b" type="number" min="0" required></label>`;$('#score-sheet-status').textContent='';sheet.hidden=false;document.body.classList.add('modal-open')}
 function closeScore(){const s=$('#score-sheet');s.hidden=true;s.dataset.matchId='';document.body.classList.remove('modal-open')}
-function bindScoring(){document.querySelectorAll('.match.clickable').forEach(el=>{el.onclick=()=>openScore(el.dataset.id);el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openScore(el.dataset.id)}}});document.querySelectorAll('[data-open]').forEach(b=>{if(control)b.onclick=()=>openScore(b.dataset.open)})}
+function bindScoring(){document.querySelectorAll('.match.clickable').forEach(el=>{el.onclick=()=>openScore(el.dataset.id);el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openScore(el.dataset.id)}}})}
 async function saveScore(e){e.preventDefault();if(!control)return;const sheet=$('#score-sheet'),m=matches.find(x=>x.id===sheet.dataset.matchId),fd=new FormData(e.currentTarget),a=Number(fd.get('a')),b=Number(fd.get('b')),msg=$('#score-sheet-status'),btn=e.currentTarget.querySelector('button[type="submit"]');if(!m)return;if(!Number.isFinite(a)||!Number.isFinite(b)||a<0||b<0){msg.textContent='Enter both scores.';return}if(a===b){msg.textContent='Scores cannot tie.';return}btn.disabled=true;msg.textContent='Saving…';try{const r=await fetch('/api/cornhole',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matchId:m.id,scoreA:a,scoreB:b})}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not save result.');await load();closeScore()}catch(err){msg.textContent=err.message||'Could not save result.'}finally{btn.disabled=false}}
 async function load(){
   try{
     const [tr,mr]=await Promise.all([fetch('/api/cornhole/teams',{cache:'no-store'}),fetch('/api/cornhole',{cache:'no-store'})]);
     const [td,md]=await Promise.all([tr.json(),mr.json()]);
-    if(!tr.ok)throw new Error(td.error||'Could not load seeded Cornhole teams.');if(!mr.ok)throw new Error(md.error||'Could not load Cornhole bracket.');
-    teams=td.teams||[];teamBySeed.clear();teams.forEach(t=>teamBySeed.set(Number(t.seed),t));matches=md.matches||[];render();
-  }catch(err){teamGrid.innerHTML=`<div class="loading error">${esc(err.message)}</div>`;wb.innerHTML=`<div class="loading error">${esc(err.message)}</div>`;lb.innerHTML='';now.innerHTML=`<div class="loading error">${esc(err.message)}</div>`}
+    if(!tr.ok)throw new Error(td.error||'Could not load Cornhole teams.');if(!mr.ok)throw new Error(md.error||'Could not load Cornhole bracket.');
+    teams=td.teams||[];teamBySeed.clear();teams.filter(t=>t.seed!=null).forEach(t=>teamBySeed.set(Number(t.seed),t));matches=md.matches||[];render();
+  }catch(err){seedList.innerHTML=`<div class="loading error">${esc(err.message)}</div>`;wb.innerHTML=`<div class="loading error">${esc(err.message)}</div>`;lb.innerHTML='';finals.innerHTML='';$('#bracket-status').textContent='Load error'}
 }
 $('#score-sheet-form').addEventListener('submit',saveScore);document.querySelectorAll('[data-close-score]').forEach(x=>x.addEventListener('click',closeScore));document.addEventListener('keydown',e=>{if(e.key==='Escape')closeScore()});
 load();
