@@ -49,7 +49,7 @@ function renderSeeds(){
   seedList.innerHTML=ordered.length?ordered.map(t=>`<article class="seed-row${t.seed==null?' unseeded':''}">
     <div class="seed-badge"><span>Seed</span><strong>${t.seed==null?'N/A':esc(t.seed)}</strong></div>
     <div class="seed-team"><strong>${esc(t.players||'Unnamed pair')}</strong><small>Pair ${esc(t.pairNumber)} · ${esc(t.olympicTeam||'No Olympic team')}</small></div>
-  </article>`).join(''):'<div class="loading error">No Cornhole team pairs are saved yet.</div>';
+  </article>`).join(''):'<div class="loading">0 pairs</div>';
   const seeded=teams.filter(t=>t.seed!=null).length;
   $('#seeded-count').textContent=String(seeded);
   $('#pair-count').textContent=String(teams.length);
@@ -58,12 +58,18 @@ function renderStatus(){
   const complete=matches.filter(m=>m.properties?.Status==='Complete').length;
   const ready=matches.filter(m=>m.properties?.Status==='Ready').length;
   const el=$('#bracket-status');
-  if(!teams.length){el.textContent='No team pairs';return}
+  if(!teams.length){el.textContent='0 teams';return}
   if(!teams.some(t=>t.seed!=null)){el.textContent='Waiting for seeding';return}
   el.textContent=`${complete} complete · ${ready} ready`;
 }
 function render(){
   renderSeeds();renderStatus();
+  if(!teams.length){
+    wb.innerHTML='<div class="loading">0</div>';
+    lb.innerHTML='<div class="loading">0</div>';
+    finals.innerHTML='<div class="loading">0</div>';
+    return;
+  }
   renderRounds(wb,'Winners');renderRounds(lb,'Losers');
   const fs=matches.filter(m=>m.properties?.Bracket==='Finals').sort((a,b)=>Number(a.properties?.Round)-Number(b.properties?.Round));
   finals.innerHTML=fs.map(m=>`<section class="final-card"><h4>${esc(roundNames.Finals[m.properties?.Round]||m.properties?.Match)}</h4>${card(m)}</section>`).join('')||'<div class="loading">No championship matches found.</div>';
@@ -79,7 +85,7 @@ async function load(){
     const [td,md]=await Promise.all([tr.json(),mr.json()]);
     if(!tr.ok)throw new Error(td.error||'Could not load Cornhole teams.');if(!mr.ok)throw new Error(md.error||'Could not load Cornhole bracket.');
     teams=td.teams||[];teamBySeed.clear();teams.filter(t=>t.seed!=null).forEach(t=>teamBySeed.set(Number(t.seed),t));matches=md.matches||[];render();
-  }catch(err){seedList.innerHTML=`<div class="loading error">${esc(err.message)}</div>`;wb.innerHTML=`<div class="loading error">${esc(err.message)}</div>`;lb.innerHTML='';finals.innerHTML='';$('#bracket-status').textContent='Load error'}
+  }catch(err){seedList.innerHTML=`<div class="loading error">${esc(err.message)}</div>`;wb.innerHTML=`<div class="loading error">${esc(err.message)}</div>`;lb.innerHTML='';finals.innerHTML='';$('#seeded-count').textContent='0';$('#pair-count').textContent='0';$('#bracket-status').textContent='Load error'}
 }
 $('#score-sheet-form').addEventListener('submit',saveScore);document.querySelectorAll('[data-close-score]').forEach(x=>x.addEventListener('click',closeScore));document.addEventListener('keydown',e=>{if(e.key==='Escape')closeScore()});
 load();
