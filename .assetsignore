@@ -1,5 +1,7 @@
 worker.js
 worker-entry.js
+worker-supabase.js
+supabase/
 wrangler.jsonc
 functions/
 README.md
