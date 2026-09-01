@@ -3,199 +3,51 @@ import app from './worker-supabase.js';
 const TEAMS=['Team Red','Team Blue','Team Green','Team Gold'];
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 const cleanBase=url=>String(url||'').replace(/\/+$/,'').replace(/\/rest\/v1$/,'');
+const headers=(env,extra={})=>({apikey:env.SUPABASE_SECRET_KEY,'Content-Type':'application/json',...extra});
+async function sb(env,path,init={}){const base=cleanBase(env.SUPABASE_URL);if(!base)throw new Error('SUPABASE_URL is missing from the Worker runtime.');if(!env.SUPABASE_SECRET_KEY)throw new Error('SUPABASE_SECRET_KEY is missing from the Worker runtime.');const r=await fetch(`${base}/rest/v1/${path}`,{...init,headers:headers(env,init.headers||{})});const text=await r.text();let data=null;try{data=text?JSON.parse(text):null}catch{data=text}if(!r.ok)throw new Error(`Supabase ${r.status}: ${typeof data==='string'?data:(data?.message||JSON.stringify(data))}`);return data}
+async function verifyAdmin(request,env){if(request.method!=='POST')return json({error:'Method not allowed'},405);if(!env.ADMIN_SCORE_CODE)return json({error:'ADMIN_SCORE_CODE is missing.'},503);let b={};try{b=await request.json()}catch{return json({error:'Invalid request.'},400)}if(String(b.code||'')!==String(env.ADMIN_SCORE_CODE))return json({ok:false,error:'Incorrect control code.'},401);return json({ok:true})}
+function migrationError(m){m=String(m||'');return ['participant_key','event_key','event_pairs','participants.team',"Could not find the 'team'","Could not find the 'seed'"].some(x=>m.includes(x))}
 
-function headers(env,extra={}){
-  return {apikey:env.SUPABASE_SECRET_KEY,'Content-Type':'application/json',...extra};
-}
+async function loadEditorData(env){const [ps,es,rs]=await Promise.all([sb(env,'participants?select=id,notion_page_id,participant,participant_key,divisions,team&order=participant.asc'),sb(env,'olympic_events?select=id,notion_page_id,event,event_key,event_number,format,divisions&order=event_number.asc'),sb(env,'registrations?select=participant_id,event_id')]);const map=new Map();for(const r of rs){if(!map.has(r.participant_id))map.set(r.participant_id,[]);map.get(r.participant_id).push(r.event_id)}return{participants:ps.map(p=>({id:p.notion_page_id,key:p.participant_key,name:p.participant,divisions:p.divisions||[],team:p.team||'',registeredEventUuids:map.get(p.id)||[]})),events:es.map(e=>({id:e.notion_page_id,key:e.event_key,name:e.event,number:e.event_number,format:e.format||'',divisions:e.divisions||[],uuid:e.id})),teams:TEAMS}}
 
-async function sb(env,path,init={}){
-  const base=cleanBase(env.SUPABASE_URL);
-  if(!base)throw new Error('SUPABASE_URL is missing from the Worker runtime.');
-  if(!env.SUPABASE_SECRET_KEY)throw new Error('SUPABASE_SECRET_KEY is missing from the Worker runtime.');
-  const response=await fetch(`${base}/rest/v1/${path}`,{...init,headers:headers(env,init.headers||{})});
-  const text=await response.text();
-  let data=null;
-  try{data=text?JSON.parse(text):null}catch{data=text}
-  if(!response.ok)throw new Error(`Supabase ${response.status}: ${typeof data==='string'?data:(data?.message||JSON.stringify(data))}`);
-  return data;
-}
-
-async function verifyAdmin(request,env){
-  if(request.method!=='POST')return json({error:'Method not allowed'},405);
-  if(!env.ADMIN_SCORE_CODE)return json({error:'ADMIN_SCORE_CODE is missing.'},503);
-  let body={};
-  try{body=await request.json()}catch{return json({error:'Invalid request.'},400)}
-  if(String(body.code||'')!==String(env.ADMIN_SCORE_CODE))return json({ok:false,error:'Incorrect control code.'},401);
-  return json({ok:true});
-}
-
-function migrationError(message){
-  const m=String(message||'');
-  return m.includes('participant_key')||m.includes('event_key')||m.includes('event_pairs')||m.includes('participants.team')||m.includes("Could not find the 'team'");
-}
-
-async function loadEditorData(env){
-  const [participants,events,registrations]=await Promise.all([
-    sb(env,'participants?select=id,notion_page_id,participant,participant_key,divisions,team&order=participant.asc'),
-    sb(env,'olympic_events?select=id,notion_page_id,event,event_key,event_number,format,divisions&order=event_number.asc'),
-    sb(env,'registrations?select=participant_id,event_id')
-  ]);
-  const eventIdsByParticipant=new Map();
-  for(const r of registrations){
-    if(!eventIdsByParticipant.has(r.participant_id))eventIdsByParticipant.set(r.participant_id,[]);
-    eventIdsByParticipant.get(r.participant_id).push(r.event_id);
-  }
-  return {
-    participants:participants.map(p=>({
-      id:p.notion_page_id,
-      key:p.participant_key,
-      name:p.participant,
-      divisions:p.divisions||[],
-      team:p.team||'',
-      registeredEventUuids:eventIdsByParticipant.get(p.id)||[]
-    })),
-    events:events.map(e=>({
-      id:e.notion_page_id,
-      key:e.event_key,
-      name:e.event,
-      number:e.event_number,
-      format:e.format||'',
-      divisions:e.divisions||[],
-      uuid:e.id
-    })),
-    teams:TEAMS
-  };
-}
+async function eventContext(env,eventKey){const es=await sb(env,`olympic_events?select=id,event,event_key,event_number&event_key=eq.${encodeURIComponent(eventKey)}&limit=1`);const event=es[0];if(!event)throw new Error('Event not found.');const [pairs,ps,rs]=await Promise.all([sb(env,`event_pairs?select=id,pair_number,olympic_team,participant_1_id,participant_2_id,seed&event_id=eq.${event.id}&order=pair_number.asc`),sb(env,'participants?select=id,participant,participant_key,team&order=participant.asc'),sb(env,`registrations?select=participant_id&event_id=eq.${event.id}`)]);return{event,pairs,ps,registered:new Set(rs.map(r=>r.participant_id))}}
+function pairDto(p,byId){return{id:p.id,pairNumber:p.pair_number,team:p.olympic_team,seed:p.seed||null,member1Key:byId.get(p.participant_1_id)?.participant_key||'',member1Name:byId.get(p.participant_1_id)?.participant||'',member2Key:byId.get(p.participant_2_id)?.participant_key||'',member2Name:byId.get(p.participant_2_id)?.participant||''}}
 
 async function teamEditor(request,env){
   if(request.method!=='POST')return json({error:'Method not allowed'},405);
   if(!env.ADMIN_SCORE_CODE)return json({error:'ADMIN_SCORE_CODE is missing.'},503);
-  let body={};
-  try{body=await request.json()}catch{return json({error:'Invalid request.'},400)}
+  let body={};try{body=await request.json()}catch{return json({error:'Invalid request.'},400)}
   if(String(body.code||'')!==String(env.ADMIN_SCORE_CODE))return json({error:'Incorrect control code.'},401);
-
   try{
-    if(body.action==='list'){
-      const data=await loadEditorData(env);
-      return json({ok:true,...data});
-    }
-
+    if(body.action==='list')return json({ok:true,...await loadEditorData(env)});
     if(body.action==='save'){
-      const assignments=Array.isArray(body.assignments)?body.assignments:[];
-      if(!assignments.length)return json({error:'No team assignments were provided.'},400);
-      const rows=await sb(env,'participants?select=id,notion_page_id,participant_key,participant,team');
-      const byKey=new Map(rows.filter(p=>p.participant_key).map(p=>[p.participant_key,p]));
-      const byLegacy=new Map(rows.map(p=>[p.notion_page_id,p]));
-      const seen=new Set();
-      const resolved=[];
-      for(const a of assignments){
-        const key=String(a.participantKey||'');
-        const legacy=String(a.participantId||'');
-        const person=(key&&byKey.get(key))||(legacy&&byLegacy.get(legacy));
-        const team=String(a.team||'');
-        if(!person||seen.has(person.id))return json({error:'Invalid or duplicate participant assignment.'},400);
-        if(team&&!TEAMS.includes(team))return json({error:`Invalid team: ${team}`},400);
-        seen.add(person.id);
-        resolved.push({person,team});
-      }
-
-      // Batch by destination team instead of sending one PATCH per participant.
-      // This keeps a save to at most five Supabase PATCH requests (4 teams + unassigned),
-      // which stays comfortably under Cloudflare's Worker subrequest limits.
-      const groups=new Map();
-      for(const item of resolved){
-        const groupKey=item.team||'';
-        if(!groups.has(groupKey))groups.set(groupKey,[]);
-        groups.get(groupKey).push(item.person.id);
-      }
-      for(const [team,ids] of groups){
-        if(!ids.length)continue;
-        const filter=ids.map(id=>encodeURIComponent(id)).join(',');
-        await sb(env,`participants?id=in.(${filter})`,{
-          method:'PATCH',
-          headers:{Prefer:'return=minimal'},
-          body:JSON.stringify({team:team||null})
-        });
-      }
-      return json({ok:true,saved:resolved.length});
+      const assignments=Array.isArray(body.assignments)?body.assignments:[];if(!assignments.length)return json({error:'No team assignments were provided.'},400);
+      const rows=await sb(env,'participants?select=id,notion_page_id,participant_key,participant,team'),byKey=new Map(rows.filter(p=>p.participant_key).map(p=>[p.participant_key,p])),byLegacy=new Map(rows.map(p=>[p.notion_page_id,p])),seen=new Set(),resolved=[];
+      for(const a of assignments){const person=byKey.get(String(a.participantKey||''))||byLegacy.get(String(a.participantId||'')),team=String(a.team||'');if(!person||seen.has(person.id))return json({error:'Invalid or duplicate participant assignment.'},400);if(team&&!TEAMS.includes(team))return json({error:`Invalid team: ${team}`},400);seen.add(person.id);resolved.push({person,team})}
+      const groups=new Map();for(const x of resolved){const k=x.team||'';if(!groups.has(k))groups.set(k,[]);groups.get(k).push(x.person.id)}for(const [team,ids] of groups){const f=ids.map(encodeURIComponent).join(',');await sb(env,`participants?id=in.(${f})`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({team:team||null})})}return json({ok:true,saved:resolved.length});
     }
-
     if(body.action==='eventPairs'){
-      const eventKey=String(body.eventKey||'');
-      if(!eventKey)return json({error:'Choose an event.'},400);
-      const events=await sb(env,`olympic_events?select=id,event,event_key,event_number&event_key=eq.${encodeURIComponent(eventKey)}&limit=1`);
-      const event=events[0];
-      if(!event)return json({error:'Event not found.'},404);
-      const [pairs,participants,registrations]=await Promise.all([
-        sb(env,`event_pairs?select=id,pair_number,olympic_team,participant_1_id,participant_2_id&event_id=eq.${encodeURIComponent(event.id)}&order=pair_number.asc`),
-        sb(env,'participants?select=id,participant,participant_key,team&order=participant.asc'),
-        sb(env,`registrations?select=participant_id&event_id=eq.${encodeURIComponent(event.id)}`)
-      ]);
-      const registered=new Set(registrations.map(r=>r.participant_id));
-      const byId=new Map(participants.map(p=>[p.id,p]));
-      const eligible=participants.filter(p=>registered.has(p.id)&&TEAMS.includes(p.team)).map(p=>({key:p.participant_key,name:p.participant,team:p.team}));
-      return json({
-        ok:true,
-        event:{key:event.event_key,name:event.event,number:event.event_number},
-        eligible,
-        pairs:pairs.map(p=>({
-          pairNumber:p.pair_number,
-          team:p.olympic_team,
-          member1Key:byId.get(p.participant_1_id)?.participant_key||'',
-          member1Name:byId.get(p.participant_1_id)?.participant||'',
-          member2Key:byId.get(p.participant_2_id)?.participant_key||'',
-          member2Name:byId.get(p.participant_2_id)?.participant||''
-        }))
-      });
+      const key=String(body.eventKey||'');if(!key)return json({error:'Choose an event.'},400);const {event,pairs,ps,registered}=await eventContext(env,key),byId=new Map(ps.map(p=>[p.id,p]));const eligible=ps.filter(p=>registered.has(p.id)&&TEAMS.includes(p.team)).map(p=>({key:p.participant_key,name:p.participant,team:p.team}));return json({ok:true,event:{key:event.event_key,name:event.event,number:event.event_number},eligible,pairs:pairs.map(p=>pairDto(p,byId))});
     }
-
     if(body.action==='saveEventPairs'){
-      const eventKey=String(body.eventKey||'');
-      const incoming=Array.isArray(body.pairs)?body.pairs:[];
-      if(!eventKey)return json({error:'Choose an event.'},400);
-      const events=await sb(env,`olympic_events?select=id,event,event_key&event_key=eq.${encodeURIComponent(eventKey)}&limit=1`);
-      const event=events[0];
-      if(!event)return json({error:'Event not found.'},404);
-      const [participants,registrations]=await Promise.all([
-        sb(env,'participants?select=id,participant,participant_key,team'),
-        sb(env,`registrations?select=participant_id&event_id=eq.${encodeURIComponent(event.id)}`)
-      ]);
-      const byKey=new Map(participants.filter(p=>p.participant_key).map(p=>[p.participant_key,p]));
-      const registered=new Set(registrations.map(r=>r.participant_id));
-      const used=new Set();
-      const rows=[];
-      for(let i=0;i<incoming.length;i++){
-        const item=incoming[i]||{};
-        const a=byKey.get(String(item.member1Key||''));
-        const b=byKey.get(String(item.member2Key||''));
-        if(!a||!b)return json({error:`Pair ${i+1} needs two valid participants.`},400);
-        if(a.id===b.id)return json({error:`Pair ${i+1} cannot use the same person twice.`},400);
-        if(!registered.has(a.id)||!registered.has(b.id))return json({error:`Both people in Pair ${i+1} must be registered for ${event.event}.`},400);
-        if(!a.team||!b.team||a.team!==b.team||!TEAMS.includes(a.team))return json({error:`Pair ${i+1} must contain two people from the same Olympic team.`},400);
-        if(used.has(a.id)||used.has(b.id))return json({error:`A participant can only appear once in ${event.event}.`},400);
-        used.add(a.id);used.add(b.id);
-        rows.push({event_id:event.id,pair_number:i+1,olympic_team:a.team,participant_1_id:a.id,participant_2_id:b.id});
-      }
-      await sb(env,`event_pairs?event_id=eq.${encodeURIComponent(event.id)}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});
-      if(rows.length)await sb(env,'event_pairs',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(rows)});
-      return json({ok:true,saved:rows.length});
+      const key=String(body.eventKey||''),incoming=Array.isArray(body.pairs)?body.pairs:[];if(!key)return json({error:'Choose an event.'},400);const {event,ps,registered}=await eventContext(env,key),byKey=new Map(ps.filter(p=>p.participant_key).map(p=>[p.participant_key,p])),used=new Set(),rows=[];
+      for(let i=0;i<incoming.length;i++){const x=incoming[i]||{},a=byKey.get(String(x.member1Key||'')),b=byKey.get(String(x.member2Key||''));if(!a||!b)return json({error:`Pair ${i+1} needs two valid participants.`},400);if(a.id===b.id)return json({error:`Pair ${i+1} cannot use the same person twice.`},400);if(!registered.has(a.id)||!registered.has(b.id))return json({error:`Both people in Pair ${i+1} must be registered for ${event.event}.`},400);if(!a.team||a.team!==b.team||!TEAMS.includes(a.team))return json({error:`Pair ${i+1} must contain two people from the same Olympic team.`},400);if(used.has(a.id)||used.has(b.id))return json({error:`A participant can only appear once in ${event.event}.`},400);used.add(a.id);used.add(b.id);rows.push({event_id:event.id,pair_number:i+1,olympic_team:a.team,participant_1_id:a.id,participant_2_id:b.id,seed:null})}
+      await sb(env,`event_pairs?event_id=eq.${event.id}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});if(rows.length)await sb(env,'event_pairs',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(rows)});return json({ok:true,saved:rows.length});
     }
-
+    if(body.action==='cornholeSeeding'){
+      const {event,pairs,ps}=await eventContext(env,'cornhole'),byId=new Map(ps.map(p=>[p.id,p]));const matches=await sb(env,'cornhole_matches?select=match_code,status,score_a,score_b,winner&order=sort_order.asc');return json({ok:true,event:{key:event.event_key,name:event.event},pairs:pairs.map(p=>pairDto(p,byId)),started:matches.some(m=>m.status==='Complete'||m.score_a!=null||m.score_b!=null)});
+    }
+    if(body.action==='seedCornhole'){
+      const seeds=Array.isArray(body.seeds)?body.seeds:[],forceReset=Boolean(body.forceReset);const {event,pairs,ps}=await eventContext(env,'cornhole');if(!pairs.length)return json({error:'Create and save Cornhole pairs first.'},400);if(pairs.length>8)return json({error:'Cornhole supports a maximum of 8 pairs.'},400);if(seeds.length!==pairs.length)return json({error:'Every Cornhole pair must have a seed.'},400);
+      const pairById=new Map(pairs.map(p=>[p.id,p])),seedNums=new Set(),pairIds=new Set();for(const x of seeds){const n=Number(x.seed),id=String(x.pairId||'');if(!pairById.has(id)||!Number.isInteger(n)||n<1||n>8||seedNums.has(n)||pairIds.has(id))return json({error:'Seeds must be unique numbers from 1 to 8, with each pair used once.'},400);seedNums.add(n);pairIds.add(id)}
+      const matches=await sb(env,'cornhole_matches?select=id,match_code,status,score_a,score_b&order=sort_order.asc'),started=matches.some(m=>m.status==='Complete'||m.score_a!=null||m.score_b!=null);if(started&&!forceReset)return json({ok:false,needsResetConfirmation:true,error:'Cornhole has results. Confirm reset before reseeding.'},409);
+      await sb(env,'cornhole_matches?match_code=not.is.null',{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({team_a:null,team_b:null,team_a_players:null,team_b_players:null,score_a:null,score_b:null,winner:null,loser:null,status:'Waiting'})});
+      await sb(env,`event_pairs?event_id=eq.${event.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({seed:null})});
+      const byId=new Map(ps.map(p=>[p.id,p])),seeded=new Map();for(const x of seeds){const p=pairById.get(String(x.pairId)),n=Number(x.seed),a=byId.get(p.participant_1_id),b=byId.get(p.participant_2_id);seeded.set(n,{p,a,b,label:`Cornhole Team ${p.pair_number}`,players:`${a?.participant||''} + ${b?.participant||''}`});await sb(env,`event_pairs?id=eq.${p.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({seed:n})})}
+      const openings=[['W1',1,8],['W2',4,5],['W3',2,7],['W4',3,6]];for(const [code,sa,sbSeed] of openings){const m=matches.find(x=>x.match_code===code);if(!m)continue;const a=seeded.get(sa),b=seeded.get(sbSeed),status=a&&b?'Ready':(a||b)?'Waiting':'Waiting';await sb(env,`cornhole_matches?id=eq.${m.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({team_a:a?.label||null,team_a_players:a?.players||null,team_b:b?.label||null,team_b_players:b?.players||null,status})})}
+      return json({ok:true,seeded:seeds.length,reset:started});
+    }
     return json({error:'Unknown team editor action.'},400);
-  }catch(err){
-    const message=String(err?.message||err);
-    if(migrationError(message)){
-      return json({error:'Team/Event Team database update is not installed yet. Run supabase/add-participant-teams.sql in Supabase.'},503);
-    }
-    return json({error:message},502);
-  }
+  }catch(err){const message=String(err?.message||err);if(migrationError(message))return json({error:'Team/Event Team database update is not installed yet. Run the latest supabase/add-participant-teams.sql in Supabase.'},503);return json({error:message},502)}
 }
-
-export default{
-  async fetch(request,env,ctx){
-    const path=new URL(request.url).pathname;
-    if(path==='/api/admin/verify')return verifyAdmin(request,env);
-    if(path==='/api/admin/teams')return teamEditor(request,env);
-    return app.fetch(request,env,ctx);
-  }
-};
+export default{async fetch(request,env,ctx){const path=new URL(request.url).pathname;if(path==='/api/admin/verify')return verifyAdmin(request,env);if(path==='/api/admin/teams')return teamEditor(request,env);return app.fetch(request,env,ctx)}};
