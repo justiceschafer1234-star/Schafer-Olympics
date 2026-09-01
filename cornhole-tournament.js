@@ -28,9 +28,9 @@ function slot(label,players,score,done,winner,placeholder){
 }
 function card(m){
   const p=m.properties||{},done=p.Status==='Complete',ready=p.Status==='Ready',inputs=inbound(p.Match),phA=inputs.shift()||'Awaiting result',phB=inputs.shift()||'Awaiting result';
-  const clickable=control&&ready&&!done;
+  const clickable=control&&(ready||done)&&p['Team A']&&p['Team B'];
   return `<article class="match ${statusClass(p.Status)}${clickable?' clickable':''}" data-id="${esc(m.id)}" ${clickable?'tabindex="0" role="button"':''}>
-    <div class="match-head"><strong>${esc(p.Match||'Match')}</strong><span>${clickable?'Tap to score':esc(p.Status||'Waiting')}</span></div>
+    <div class="match-head"><strong>${esc(p.Match||'Match')}</strong><span>${clickable?(done?'Tap to edit score':'Tap to score'):esc(p.Status||'Waiting')}</span></div>
     ${slot(p['Team A'],p['Team A Players'],p['Score A'],done,p.Winner,phA)}
     ${slot(p['Team B'],p['Team B Players'],p['Score B'],done,p.Winner,phB)}
   </article>`;
@@ -75,10 +75,52 @@ function render(){
   finals.innerHTML=fs.map(m=>`<section class="final-card"><h4>${esc(roundNames.Finals[m.properties?.Round]||m.properties?.Match)}</h4>${card(m)}</section>`).join('')||'<div class="loading">No championship matches found.</div>';
   bindScoring();
 }
-function openScore(id){if(!control)return;const m=matches.find(x=>x.id===id);if(!m||m.properties?.Status!=='Ready')return;const p=m.properties,a=canonical(p['Team A'],p['Team A Players']),b=canonical(p['Team B'],p['Team B Players']),sheet=$('#score-sheet');sheet.dataset.matchId=id;$('#score-sheet-title').textContent=`${p.Match} · Enter Score`;$('#score-sheet-teams').innerHTML=`<div><strong>${esc(a.players||a.label)}</strong><small>${esc([a.label,a.olympicTeam].filter(Boolean).join(' · '))}</small></div><span>vs</span><div><strong>${esc(b.players||b.label)}</strong><small>${esc([b.label,b.olympicTeam].filter(Boolean).join(' · '))}</small></div>`;$('#score-sheet-fields').innerHTML=`<label><span>${esc(a.players||a.label)}</span><input name="a" type="number" min="0" required></label><label><span>${esc(b.players||b.label)}</span><input name="b" type="number" min="0" required></label>`;$('#score-sheet-status').textContent='';sheet.hidden=false;document.body.classList.add('modal-open')}
-function closeScore(){const s=$('#score-sheet');s.hidden=true;s.dataset.matchId='';document.body.classList.remove('modal-open')}
+function openScore(id){
+  if(!control)return;
+  const m=matches.find(x=>x.id===id);if(!m)return;
+  const p=m.properties,done=p.Status==='Complete';
+  if(!(p.Status==='Ready'||done)||!p['Team A']||!p['Team B'])return;
+  const a=canonical(p['Team A'],p['Team A Players']),b=canonical(p['Team B'],p['Team B Players']),sheet=$('#score-sheet');
+  sheet.dataset.matchId=id;
+  sheet.dataset.wasComplete=done?'1':'0';
+  $('#score-sheet-title').textContent=`${p.Match} · ${done?'Edit Score':'Enter Score'}`;
+  $('#score-sheet-teams').innerHTML=`<div><strong>${esc(a.players||a.label)}</strong><small>${esc([a.label,a.olympicTeam].filter(Boolean).join(' · '))}</small></div><span>vs</span><div><strong>${esc(b.players||b.label)}</strong><small>${esc([b.label,b.olympicTeam].filter(Boolean).join(' · '))}</small></div>`;
+  $('#score-sheet-fields').innerHTML=`<label><span>${esc(a.players||a.label)}</span><input name="a" type="number" min="0" value="${p['Score A']??''}" required></label><label><span>${esc(b.players||b.label)}</span><input name="b" type="number" min="0" value="${p['Score B']??''}" required></label>`;
+  $('#score-sheet-status').textContent=done?'Editing a completed match. If the winner changes, affected later matches will be reset.':'';
+  sheet.hidden=false;document.body.classList.add('modal-open');
+}
+function closeScore(){const s=$('#score-sheet');s.hidden=true;s.dataset.matchId='';s.dataset.wasComplete='';document.body.classList.remove('modal-open')}
 function bindScoring(){document.querySelectorAll('.match.clickable').forEach(el=>{el.onclick=()=>openScore(el.dataset.id);el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openScore(el.dataset.id)}}})}
-async function saveScore(e){e.preventDefault();if(!control)return;const sheet=$('#score-sheet'),m=matches.find(x=>x.id===sheet.dataset.matchId),fd=new FormData(e.currentTarget),a=Number(fd.get('a')),b=Number(fd.get('b')),msg=$('#score-sheet-status'),btn=e.currentTarget.querySelector('button[type="submit"]');if(!m)return;if(!Number.isFinite(a)||!Number.isFinite(b)||a<0||b<0){msg.textContent='Enter both scores.';return}if(a===b){msg.textContent='Scores cannot tie.';return}const code=sessionStorage.getItem('schaferOlympicsControlCode')||'';if(!code){msg.textContent='Control View is locked. Re-enter Control View.';return}btn.disabled=true;msg.textContent='Saving…';try{const r=await fetch('/api/cornhole',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matchId:m.id,scoreA:a,scoreB:b,code})}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not save result.');if(Array.isArray(d.matches)){matches=d.matches;render()}closeScore()}catch(err){msg.textContent=err.message||'Could not save result.'}finally{btn.disabled=false}}
+async function postScore(m,a,b,code,allowWinnerChange){
+  const r=await fetch('/api/cornhole',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matchId:m.id,scoreA:a,scoreB:b,code,allowWinnerChange})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){const err=new Error(d.error||'Could not save result.');err.data=d;throw err}
+  return d;
+}
+async function saveScore(e){
+  e.preventDefault();if(!control)return;
+  const sheet=$('#score-sheet'),m=matches.find(x=>x.id===sheet.dataset.matchId),fd=new FormData(e.currentTarget),a=Number(fd.get('a')),b=Number(fd.get('b')),msg=$('#score-sheet-status'),btn=e.currentTarget.querySelector('button[type="submit"]');
+  if(!m)return;if(!Number.isFinite(a)||!Number.isFinite(b)||a<0||b<0){msg.textContent='Enter both scores.';return}if(a===b){msg.textContent='Scores cannot tie.';return}
+  const code=sessionStorage.getItem('schaferOlympicsControlCode')||'';if(!code){msg.textContent='Control View is locked. Re-enter Control View.';return}
+  const p=m.properties||{},newWinner=a>b?p['Team A']:p['Team B'],winnerChanges=p.Status==='Complete'&&p.Winner&&p.Winner!==newWinner;
+  let allowWinnerChange=false;
+  if(winnerChanges){
+    allowWinnerChange=confirm(`This changes the winner from ${p.Winner} to ${newWinner}. All affected downstream Cornhole matches and scores will be reset so the bracket stays valid. Continue?`);
+    if(!allowWinnerChange)return;
+  }
+  btn.disabled=true;msg.textContent='Saving…';
+  try{
+    let d;
+    try{d=await postScore(m,a,b,code,allowWinnerChange)}catch(err){
+      if(err.data?.needsWinnerChangeConfirmation&&!allowWinnerChange){
+        if(!confirm('This correction changes the winner and will reset affected downstream Cornhole matches. Continue?'))throw err;
+        d=await postScore(m,a,b,code,true);
+      }else throw err;
+    }
+    if(Array.isArray(d.matches)){matches=d.matches;render()}
+    closeScore();
+  }catch(err){msg.textContent=err.message||'Could not save result.'}finally{btn.disabled=false}
+}
 async function load(){
   try{
     const [tr,mr]=await Promise.all([fetch('/api/cornhole/teams',{cache:'no-store'}),fetch('/api/cornhole',{cache:'no-store'})]);
