@@ -1,6 +1,7 @@
 -- Run this in the Supabase SQL editor.
 -- Safe to run more than once.
--- Adds Olympic team assignments, readable keys, event-specific pairs, and manual seeds.
+-- Adds Olympic team assignments, readable keys, event-specific pairs, manual seeds,
+-- and the extra matches/routing needed for a 10-team Cornhole double-elimination bracket.
 
 alter table public.participants add column if not exists team text;
 alter table public.participants add column if not exists participant_key text;
@@ -52,7 +53,7 @@ create table if not exists public.event_pairs (
 
 alter table public.event_pairs add column if not exists seed integer;
 alter table public.event_pairs drop constraint if exists event_pairs_seed_check;
-alter table public.event_pairs add constraint event_pairs_seed_check check (seed is null or seed between 1 and 8);
+alter table public.event_pairs add constraint event_pairs_seed_check check (seed is null or seed between 1 and 10);
 create unique index if not exists event_pairs_event_seed_idx on public.event_pairs(event_id, seed) where seed is not null;
 create index if not exists event_pairs_event_idx on public.event_pairs(event_id);
 create index if not exists event_pairs_team_idx on public.event_pairs(event_id, olympic_team);
@@ -69,3 +70,36 @@ begin
     execute 'create trigger set_event_pairs_updated_at before update on public.event_pairs for each row execute function public.set_updated_at()';
   end if;
 end $$;
+
+-- 10-team Cornhole bracket.
+-- P1/P2 are the opening play-in matches. L7/L8 extend the elimination side so
+-- every one of the ten teams still receives two-loss double-elimination protection.
+insert into public.cornhole_matches
+  (notion_page_id,match_code,bracket,round_number,match_number,status,winner_to,loser_to,sort_order,notion_raw)
+values
+  ('supabase-cornhole-p1','P1','Winners',1,1,'Waiting','W1','L1',5,'{}'::jsonb),
+  ('supabase-cornhole-p2','P2','Winners',1,2,'Waiting','W3','L2',6,'{}'::jsonb),
+  ('supabase-cornhole-l7','L7','Losers',4,7,'Waiting','L8',null,75,'{}'::jsonb),
+  ('supabase-cornhole-l8','L8','Losers',5,8,'Waiting','GF1',null,85,'{}'::jsonb)
+on conflict (match_code) do nothing;
+
+-- Winners side: 8/9 and 7/10 play in; top six seeds enter the eight-team main draw.
+update public.cornhole_matches set bracket='Winners',round_number=2,winner_to='W5',loser_to='L3',sort_order=10 where match_code='W1';
+update public.cornhole_matches set bracket='Winners',round_number=2,winner_to='W5',loser_to='L1',sort_order=11 where match_code='W2';
+update public.cornhole_matches set bracket='Winners',round_number=2,winner_to='W6',loser_to='L4',sort_order=12 where match_code='W3';
+update public.cornhole_matches set bracket='Winners',round_number=2,winner_to='W6',loser_to='L2',sort_order=13 where match_code='W4';
+update public.cornhole_matches set bracket='Winners',round_number=3,winner_to='W7',loser_to='L6',sort_order=30 where match_code='W5';
+update public.cornhole_matches set bracket='Winners',round_number=3,winner_to='W7',loser_to='L5',sort_order=31 where match_code='W6';
+update public.cornhole_matches set bracket='Winners',round_number=4,winner_to='GF1',loser_to='L8',sort_order=60 where match_code='W7';
+
+-- Losers side for ten teams.
+update public.cornhole_matches set bracket='Losers',round_number=1,winner_to='L3',loser_to=null,sort_order=20 where match_code='L1';
+update public.cornhole_matches set bracket='Losers',round_number=1,winner_to='L4',loser_to=null,sort_order=21 where match_code='L2';
+update public.cornhole_matches set bracket='Losers',round_number=2,winner_to='L5',loser_to=null,sort_order=40 where match_code='L3';
+update public.cornhole_matches set bracket='Losers',round_number=2,winner_to='L6',loser_to=null,sort_order=41 where match_code='L4';
+update public.cornhole_matches set bracket='Losers',round_number=3,winner_to='L7',loser_to=null,sort_order=50 where match_code='L5';
+update public.cornhole_matches set bracket='Losers',round_number=3,winner_to='L7',loser_to=null,sort_order=51 where match_code='L6';
+update public.cornhole_matches set bracket='Losers',round_number=4,winner_to='L8',loser_to=null,sort_order=75 where match_code='L7';
+update public.cornhole_matches set bracket='Losers',round_number=5,winner_to='GF1',loser_to=null,sort_order=85 where match_code='L8';
+update public.cornhole_matches set bracket='Finals',round_number=1,sort_order=90 where match_code='GF1';
+update public.cornhole_matches set bracket='Finals',round_number=2,sort_order=100 where match_code='GF2';
