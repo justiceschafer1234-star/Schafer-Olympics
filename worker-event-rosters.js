@@ -25,4 +25,22 @@ async function eventRosters(request,env){
   }catch(e){return json({error:String(e?.message||e)},502)}
 }
 
-export default{async fetch(request,env,ctx){const path=new URL(request.url).pathname;if(path==='/api/event-rosters')return eventRosters(request,env);return app.fetch(request,env,ctx)}};
+async function cornholeTeams(request,env){
+  if(request.method!=='GET')return json({error:'Method not allowed'},405);
+  try{
+    const events=await sb(env,'olympic_events?select=id,event,event_key&event_key=eq.cornhole&limit=1'),event=events[0];
+    if(!event)return json({error:'Cornhole event not found.'},404);
+    const [pairs,people]=await Promise.all([
+      sb(env,`event_pairs?select=id,pair_number,olympic_team,participant_1_id,participant_2_id,seed&event_id=eq.${event.id}&seed=not.is.null&order=seed.asc`),
+      sb(env,'participants?select=id,participant,team')
+    ]);
+    const byId=new Map(people.map(p=>[p.id,p]));
+    const teams=pairs.map(p=>{
+      const a=byId.get(p.participant_1_id),b=byId.get(p.participant_2_id);
+      return{id:p.id,seed:Number(p.seed),pairNumber:p.pair_number,olympicTeam:p.olympic_team,player1:a?.participant||'',player2:b?.participant||'',players:[a?.participant,b?.participant].filter(Boolean).join(' + ')};
+    }).sort((a,b)=>a.seed-b.seed);
+    return json({ok:true,event:{key:event.event_key,name:event.event},teams,count:teams.length,source:'event_pairs'});
+  }catch(e){return json({error:String(e?.message||e)},502)}
+}
+
+export default{async fetch(request,env,ctx){const path=new URL(request.url).pathname;if(path==='/api/event-rosters')return eventRosters(request,env);if(path==='/api/cornhole/teams')return cornholeTeams(request,env);return app.fetch(request,env,ctx)}};
