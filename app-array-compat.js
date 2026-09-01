@@ -10,3 +10,15 @@ if (!Array.prototype.replace) {
     },
   });
 }
+
+// An empty multi-select is [] and Boolean([]) is true. The legacy app used
+// Boolean(p['🥇 Team']) to decide whether an event was completed, which makes
+// every empty Gold field look completed. Replace that check once app.js has
+// established its global function binding.
+window.addEventListener('DOMContentLoaded', () => {
+  window.resultRecorded = function resultRecordedCompat(row) {
+    const p = row?.properties || {};
+    const gold = Array.isArray(p['🥇 Team']) ? p['🥇 Team'] : p['🥇 Team'] ? [p['🥇 Team']] : [];
+    return gold.length > 0 || p.Status === 'Complete';
+  };
+});
