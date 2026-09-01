@@ -45,7 +45,7 @@ async function notionQueryAll(env,id){
 }
 
 function sbHeaders(env,extra={}){
-  return {apikey:env.SUPABASE_SECRET_KEY,Authorization:`Bearer ${env.SUPABASE_SECRET_KEY}`,'Content-Type':'application/json',...extra};
+  return {apikey:env.SUPABASE_SECRET_KEY,'Content-Type':'application/json',...extra};
 }
 async function sb(env,path,init={}){
   const base=String(env.SUPABASE_URL||'').replace(/\/$/,'');
@@ -92,7 +92,6 @@ export async function migrateNotionToSupabase(env){
     upsert(env,'wiffle_ball_matches',wiffle.map(fourRow),'notion_page_id')
   ]);
 
-  // Rebuild registrations from Notion relations using the inserted UUIDs.
   const eventMap=new Map((eventInserted||[]).map(r=>[r.notion_page_id,r.id]));
   const participantMap=new Map((participantInserted||[]).map(r=>[r.notion_page_id,r.id]));
   const registrationRows=[];
@@ -102,7 +101,7 @@ export async function migrateNotionToSupabase(env){
       const event_id=eventMap.get(notionEventId);if(event_id)registrationRows.push({participant_id,event_id});
     }
   }
-  await sb(env,'registrations',{method:'DELETE',headers:{Prefer:'return=minimal'}}).catch(()=>{});
+  await sb(env,'registrations?participant_id=not.is.null',{method:'DELETE',headers:{Prefer:'return=minimal'}}).catch(()=>{});
   if(registrationRows.length)await upsert(env,'registrations',registrationRows,'participant_id,event_id');
 
   return {ok:true,counts:{events:events.length,participants:participants.length,registrations:registrationRows.length,cornhole:cornhole.length,adultSoccer:soccer.length,wiffleBall:wiffle.length}};
