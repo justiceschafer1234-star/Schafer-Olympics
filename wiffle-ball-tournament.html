@@ -1,1 +1,80 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/><meta name="theme-color" content="#eaf5ff"/><title>Schafer Olympics | Wiffle Ball</title><link rel="stylesheet" href="/four-team-tournament.css"/></head><body><div data-four-team-tournament data-endpoint="/api/wiffle-ball"><header class="hero"><div class="wrap"><a class="back" href="/tournaments.html">← Tournaments</a><p class="eyebrow">⚾ Schafer Olympics 2026</p><h1>Wiffle Ball</h1><p class="subtitle">Four-team medal tournament: two semifinals, a bronze match, and the championship.</p></div></header><main class="wrap main"><div class="statusbar"><span class="pill"><b data-complete-count>0</b>/4 games complete</span><span class="pill">Live Notion sync</span></div><section class="bracket"><div class="column"><h2>Semifinals</h2><article class="match" data-match="SF1"><div class="match__head"><span class="match__title">Semifinal 1</span><span class="match__state" data-state>Loading</span></div><div class="teamrow"><span class="team" data-team-a></span><input class="score" data-score-a type="number" min="0" inputmode="numeric" aria-label="Team A score"/></div><div class="teamrow"><span class="team" data-team-b></span><input class="score" data-score-b type="number" min="0" inputmode="numeric" aria-label="Team B score"/></div><div class="actions"><button class="save" data-save type="button">Save Result</button><button class="clear" data-clear type="button">Clear</button></div><div class="winnerline" data-winner hidden></div></article><article class="match" data-match="SF2"><div class="match__head"><span class="match__title">Semifinal 2</span><span class="match__state" data-state>Loading</span></div><div class="teamrow"><span class="team" data-team-a></span><input class="score" data-score-a type="number" min="0" inputmode="numeric" aria-label="Team A score"/></div><div class="teamrow"><span class="team" data-team-b></span><input class="score" data-score-b type="number" min="0" inputmode="numeric" aria-label="Team B score"/></div><div class="actions"><button class="save" data-save type="button">Save Result</button><button class="clear" data-clear type="button">Clear</button></div><div class="winnerline" data-winner hidden></div></article></div><div class="column"><h2>Medal Games</h2><article class="match" data-match="B"><div class="match__head"><span class="match__title">🥉 Bronze Match</span><span class="match__state" data-state>Loading</span></div><div class="teamrow"><span class="team" data-team-a></span><input class="score" data-score-a type="number" min="0" inputmode="numeric"/></div><div class="teamrow"><span class="team" data-team-b></span><input class="score" data-score-b type="number" min="0" inputmode="numeric"/></div><div class="actions"><button class="save" data-save type="button">Save Result</button><button class="clear" data-clear type="button">Clear</button></div><div class="winnerline" data-winner hidden></div></article><article class="match" data-match="F"><div class="match__head"><span class="match__title">🏆 Championship</span><span class="match__state" data-state>Loading</span></div><div class="teamrow"><span class="team" data-team-a></span><input class="score" data-score-a type="number" min="0" inputmode="numeric"/></div><div class="teamrow"><span class="team" data-team-b></span><input class="score" data-score-b type="number" min="0" inputmode="numeric"/></div><div class="actions"><button class="save" data-save type="button">Save Result</button><button class="clear" data-clear type="button">Clear</button></div><div class="winnerline" data-winner hidden></div></article></div></section><section class="medals"><h2>Medal Finish</h2><div class="podium"><div class="medal">🥇 Gold<strong data-gold>TBD</strong></div><div class="medal">🥈 Silver<strong data-silver>TBD</strong></div><div class="medal">🥉 Bronze<strong data-bronze>TBD</strong></div></div></section><p class="note" data-sync-note>Scores are saved to Notion. Completing the medal games automatically updates the Wiffle Ball Olympic event and overall standings.</p></main></div><script src="/no-zoom.js" defer></script><script src="/four-team-tournament.js" defer></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Schafer Olympics — Wiffle Ball</title>
+  <link rel="stylesheet" href="/cornhole-tournament.css?v=20260901-wiffle1">
+</head>
+<body>
+  <main class="page-shell">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Schafer Olympics 2026 · Event #19</p>
+        <h1>Wiffle Ball</h1>
+        <p class="subhead">4-team tournament · Semifinals · Third Place · Championship</p>
+      </div>
+      <a class="back-link" href="/gameday-hq">← Game Day HQ</a>
+    </header>
+
+    <section class="section seeding-section">
+      <div class="section-title-row">
+        <div>
+          <p class="eyebrow">Tournament order</p>
+          <h2>Random Seeding</h2>
+        </div>
+        <div class="seed-summary"><strong id="seeded-count">0</strong><span>of 4 seeded</span></div>
+      </div>
+      <p class="section-copy">The four Olympic teams are randomly seeded 1–4. Seed 1 plays Seed 4, and Seed 2 plays Seed 3.</p>
+      <div id="seed-actions" class="seed-actions">
+        <button id="random-seed" class="score-sheet__save" type="button">🎲 Random Seed</button>
+        <span id="seed-message" class="score-sheet__status" aria-live="polite"></span>
+      </div>
+      <div id="seed-list" class="seed-list"><div class="loading">Loading Wiffle Ball seeding…</div></div>
+    </section>
+
+    <section class="section bracket-section">
+      <div class="section-title-row">
+        <div>
+          <p class="eyebrow">Four-team bracket</p>
+          <h2>Bracket</h2>
+        </div>
+        <div id="bracket-status" class="bracket-status">0 teams</div>
+      </div>
+
+      <div class="bracket-group">
+        <h3>Semifinals</h3>
+        <div class="bracket-scroll"><div id="semifinals" class="bracket winners"></div></div>
+      </div>
+
+      <div class="bracket-group finals-group">
+        <h3>Medal Games</h3>
+        <div class="bracket-scroll"><div id="medal-games" class="bracket winners"></div></div>
+      </div>
+
+      <div class="bracket-group finals-group">
+        <h3>Final Finish</h3>
+        <div id="podium"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="score-sheet" class="score-sheet" hidden>
+    <div class="score-sheet__backdrop" data-close-score></div>
+    <section class="score-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="score-sheet-title">
+      <button class="score-sheet__close" type="button" data-close-score aria-label="Close score entry">×</button>
+      <p class="eyebrow">Game score</p>
+      <h2 id="score-sheet-title">Enter result</h2>
+      <div id="score-sheet-teams" class="score-sheet__teams"></div>
+      <form id="score-sheet-form" class="score-sheet__form">
+        <div id="score-sheet-fields"></div>
+        <button class="score-sheet__save" type="submit">Save Result</button>
+        <span id="score-sheet-status" class="score-sheet__status" aria-live="polite"></span>
+      </form>
+    </section>
+  </div>
+
+  <script src="/wiffle-ball-standalone.js?v=20260901-finish2" defer></script>
+</body>
+</html>
