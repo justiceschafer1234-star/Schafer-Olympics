@@ -5,59 +5,55 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light">
   <title>Schafer Olympics — Cornhole Tournament</title>
-  <link rel="stylesheet" href="/cornhole-tournament.css?v=20260901-clean10">
+  <link rel="stylesheet" href="/cornhole-tournament.css?v=20260901-rebuild1">
 </head>
 <body>
-  <main class="shell">
-    <header class="hero">
+  <main class="page-shell">
+    <header class="page-header">
       <div>
-        <p class="eyebrow">Schafer Olympics 2026</p>
+        <p class="eyebrow">Schafer Olympics 2026 · Event #20</p>
         <h1>Cornhole Tournament</h1>
-        <p class="subhead">10-team double elimination · Live bracket · Event #20</p>
+        <p class="subhead">10-team double elimination</p>
       </div>
-      <a class="back-link" href="/gameday-hq">Back to Game Day HQ</a>
+      <a class="back-link" href="/gameday-hq">← Game Day HQ</a>
     </header>
 
-    <section class="summary-grid" aria-label="Tournament summary">
-      <article><span>Registered players</span><strong id="registered-count">—</strong></article>
-      <article><span>Seeded teams</span><strong id="team-count">—</strong></article>
-      <article><span>Format</span><strong>Double Elim.</strong></article>
-      <article><span>Bracket</span><strong>10 Teams</strong></article>
-    </section>
-
-    <section class="panel teams-panel">
-      <div class="section-heading">
+    <section class="section seeding-section">
+      <div class="section-title-row">
         <div>
-          <p class="eyebrow">Official draw</p>
-          <h2>Seeded Teams</h2>
+          <p class="eyebrow">Tournament order</p>
+          <h2>Seeding</h2>
         </div>
-        <p class="note">This list comes directly from the saved Cornhole pairs and manual seeds in Control View.</p>
+        <div class="seed-summary"><strong id="seeded-count">—</strong><span>of <span id="pair-count">—</span> seeded</span></div>
       </div>
-      <div id="team-grid" class="team-grid"><div class="loading">Loading seeded teams…</div></div>
+      <p class="section-copy">Teams come directly from the saved Cornhole team pairs. Unseeded teams stay visible and show N/A.</p>
+      <div id="seed-list" class="seed-list"><div class="loading">Loading Cornhole teams…</div></div>
     </section>
 
-    <section class="panel bracket-panel">
-      <div class="section-heading">
+    <section class="section bracket-section">
+      <div class="section-title-row">
         <div>
-          <p class="eyebrow">Live tournament</p>
-          <h2>10-Team Double-Elimination Bracket</h2>
+          <p class="eyebrow">Double elimination</p>
+          <h2>Bracket</h2>
         </div>
-        <p class="note">Seeds 8–9 and 7–10 play first. Seeds 1–6 enter the main winners draw. A team is eliminated after its second loss.</p>
+        <div id="bracket-status" class="bracket-status">Loading…</div>
       </div>
 
-      <div id="tournament-now" class="tournament-now"><div class="loading">Loading bracket…</div></div>
+      <div class="bracket-group">
+        <h3>Winners Bracket</h3>
+        <div class="bracket-scroll"><div id="winners-bracket" class="bracket winners"></div></div>
+      </div>
 
-      <h3 class="bracket-label">Winners Bracket</h3>
-      <div class="bracket-scroll"><div id="winners-bracket" class="bracket winners"></div></div>
+      <div class="bracket-group">
+        <h3>Losers Bracket</h3>
+        <div class="bracket-scroll"><div id="losers-bracket" class="bracket losers"></div></div>
+      </div>
 
-      <h3 class="bracket-label">Losers Bracket</h3>
-      <div class="bracket-scroll"><div id="losers-bracket" class="bracket losers"></div></div>
-
-      <h3 class="bracket-label">Finals</h3>
-      <div id="finals-grid" class="finals-grid"></div>
+      <div class="bracket-group finals-group">
+        <h3>Championship</h3>
+        <div id="finals-grid" class="finals-grid"></div>
+      </div>
     </section>
-
-    <p class="footer-note">Bracket engine: clean 10-team version · Data source: Supabase</p>
   </main>
 
   <div id="score-sheet" class="score-sheet" hidden>
@@ -75,6 +71,6 @@
     </section>
   </div>
 
-  <script src="/cornhole-tournament.js?v=20260901-clean10" defer></script>
+  <script src="/cornhole-tournament.js?v=20260901-rebuild1" defer></script>
 </body>
 </html>
