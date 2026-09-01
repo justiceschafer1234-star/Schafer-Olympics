@@ -51,24 +51,39 @@ async function cornholeTeams(request,env){
   try{
     const event=await findEvent(env,{eventKey:'cornhole-tournament',nameLike:'cornhole'});
     if(!event)return json({error:'Cornhole event not found in Olympic Events.'},404);
-    const rows=(await participantDetails(env,event.id)).filter(x=>x.eventTeamNumber!=null);
-    const grouped=new Map();
-    for(const row of rows){
-      const key=String(row.eventTeamNumber);
-      if(!grouped.has(key))grouped.set(key,{seed:row.seed,pairNumber:row.eventTeamNumber,olympicTeam:row.olympicTeam,players:[]});
-      const g=grouped.get(key);g.players.push(row);if(g.seed==null&&row.seed!=null)g.seed=row.seed;
-    }
-    const teams=[...grouped.values()].map(g=>({
-      seed:g.seed==null?null:Number(g.seed),
-      pairNumber:Number(g.pairNumber),
-      olympicTeam:g.olympicTeam||'',
-      player1:g.players[0]?.name||'',
-      player2:g.players[1]?.name||'',
-      players:g.players.map(x=>x.name).filter(Boolean).join(' + '),
-      participantIds:g.players.map(x=>x.participantId)
-    })).sort((a,b)=>(a.seed??999)-(b.seed??999)||a.pairNumber-b.pairNumber);
-    return json({ok:true,event:{id:event.notion_page_id,key:event.event_key,name:event.event},teams,count:teams.length,seededCount:teams.filter(t=>t.seed!=null).length,source:'event_participants'});
-  }catch(e){const m=String(e?.message||e);if(m.includes('event_participants'))return json({error:'The event_participants table is not installed yet. Run the event participant SQL in Supabase.'},503);return json({error:m},502)}
+
+    const [pairs,people]=await Promise.all([
+      sb(env,`event_pairs?select=id,pair_number,olympic_team,seed,participant_1_id,participant_2_id&event_id=eq.${event.id}&order=pair_number.asc`),
+      sb(env,'participants?select=id,participant,participant_key,team&order=participant.asc')
+    ]);
+    const byId=new Map(people.map(p=>[p.id,p]));
+
+    const teams=pairs.map(pair=>{
+      const p1=byId.get(pair.participant_1_id)||{};
+      const p2=byId.get(pair.participant_2_id)||{};
+      const player1=p1.participant||'';
+      const player2=p2.participant||'';
+      return {
+        id:pair.id,
+        seed:pair.seed==null?null:Number(pair.seed),
+        pairNumber:Number(pair.pair_number),
+        olympicTeam:pair.olympic_team||p1.team||p2.team||'',
+        player1,
+        player2,
+        players:[player1,player2].filter(Boolean).join(' + '),
+        participantIds:[pair.participant_1_id,pair.participant_2_id].filter(Boolean)
+      };
+    }).sort((a,b)=>(a.seed??999)-(b.seed??999)||a.pairNumber-b.pairNumber);
+
+    return json({
+      ok:true,
+      event:{id:event.notion_page_id,key:event.event_key,name:event.event},
+      teams,
+      count:teams.length,
+      seededCount:teams.filter(t=>t.seed!=null).length,
+      source:'event_pairs'
+    });
+  }catch(e){const m=String(e?.message||e);if(m.includes('event_pairs'))return json({error:'The event_pairs table is not available.'},503);return json({error:m},502)}
 }
 
 export default{async fetch(request,env,ctx){const path=new URL(request.url).pathname;if(path==='/api/event-rosters')return eventRosters(request,env);if(path==='/api/cornhole/teams')return cornholeTeams(request,env);return app.fetch(request,env,ctx)}};
