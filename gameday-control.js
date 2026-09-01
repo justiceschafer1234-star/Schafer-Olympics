@@ -37,18 +37,30 @@
     if(logoutButton)logoutButton.hidden=false;
     if(adminCode)adminCode.value=code;
     setupPairMaker();
+    window.dispatchEvent(new CustomEvent('schafer-control-unlocked',{detail:{code}}));
   }
 
   async function verify(code){
-    const response=await fetch('/api/admin/scores',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({code})
-    });
-    if(response.status===401)return false;
-    const data=await response.json().catch(()=>({}));
-    if(response.status===503)throw new Error(data.error||'Admin code is not configured.');
-    return response.status===400&&String(data.error||'').includes('Choose an event');
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),8000);
+    try{
+      const response=await fetch('/api/admin/verify',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({code}),
+        signal:controller.signal,
+        cache:'no-store'
+      });
+      const data=await response.json().catch(()=>({}));
+      if(response.status===401)return false;
+      if(!response.ok)throw new Error(data.error||`Control verification failed (${response.status}).`);
+      return data.ok===true;
+    }catch(err){
+      if(err?.name==='AbortError')throw new Error('Control verification timed out. The newest Worker may not be deployed yet.');
+      throw err;
+    }finally{
+      clearTimeout(timer);
+    }
   }
 
   async function unlock(){
@@ -74,7 +86,7 @@
     try{
       if(await verify(code))setControl(code);
       else sessionStorage.removeItem(STORAGE_KEY);
-    }catch{}
+    }catch{sessionStorage.removeItem(STORAGE_KEY);}
   }
 
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
