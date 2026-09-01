@@ -1,12 +1,12 @@
 (()=>{
 const $=s=>document.querySelector(s);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const control=new URLSearchParams(location.search).get('control')==='1';
 const seedList=$('#seed-list'),wb=$('#winners-bracket'),lb=$('#losers-bracket'),finals=$('#finals-grid');
 let matches=[],teams=[];
 const teamBySeed=new Map();
 const roundNames={
-  Winners:{1:'Play-In Round',2:'Quarterfinals',3:'Semifinals',4:'Winners Final'},
+  Winners:{1:'Preliminary Round',2:'Quarterfinals',3:'Semifinals',4:'Winners Final'},
   Losers:{1:'Losers Round 1',2:'Losers Round 2',3:'Losers Round 3',4:'Losers Semifinal',5:'Losers Final'},
   Finals:{1:'Grand Final',2:'Bracket Reset'}
 };
@@ -22,12 +22,12 @@ function inbound(code){
 }
 function statusClass(s){return String(s||'Waiting').toLowerCase().replaceAll(' ','-')}
 function slot(label,players,score,done,winner,placeholder){
-  const c=canonical(label,players),won=done&&label&&label===winner,main=c.players||c.label||placeholder||'TBD';
+  const c=canonical(label,players),won=done&&label&&label===winner,main=c.players||c.label||placeholder||'Awaiting result';
   const sub=[c.label,c.olympicTeam].filter(Boolean).join(' · ');
   return `<div class="slot${won?' is-winner':''}${label?'':' placeholder'}"><div><strong>${esc(main)}</strong>${sub?`<small>${esc(sub)}</small>`:''}</div>${done&&score!=null?`<b class="score">${esc(score)}</b>`:''}</div>`;
 }
 function card(m){
-  const p=m.properties||{},done=p.Status==='Complete',ready=p.Status==='Ready',inputs=inbound(p.Match),phA=p['Team A']?'TBD':inputs.shift()||'TBD',phB=p['Team B']?'TBD':inputs.shift()||'TBD';
+  const p=m.properties||{},done=p.Status==='Complete',ready=p.Status==='Ready',inputs=inbound(p.Match),phA=inputs.shift()||'Awaiting result',phB=inputs.shift()||'Awaiting result';
   const clickable=control&&ready&&!done;
   return `<article class="match ${statusClass(p.Status)}${clickable?' clickable':''}" data-id="${esc(m.id)}" ${clickable?'tabindex="0" role="button"':''}>
     <div class="match-head"><strong>${esc(p.Match||'Match')}</strong><span>${clickable?'Tap to score':esc(p.Status||'Waiting')}</span></div>
