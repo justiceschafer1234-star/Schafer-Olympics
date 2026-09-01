@@ -20,6 +20,15 @@ async function sb(env,path,init={}){
   return data;
 }
 
+async function verifyAdmin(request,env){
+  if(request.method!=='POST')return json({error:'Method not allowed'},405);
+  if(!env.ADMIN_SCORE_CODE)return json({error:'ADMIN_SCORE_CODE is missing.'},503);
+  let body={};
+  try{body=await request.json()}catch{return json({error:'Invalid request.'},400)}
+  if(String(body.code||'')!==String(env.ADMIN_SCORE_CODE))return json({ok:false,error:'Incorrect control code.'},401);
+  return json({ok:true});
+}
+
 async function teamEditor(request,env){
   if(request.method!=='POST')return json({error:'Method not allowed'},405);
   if(!env.ADMIN_SCORE_CODE)return json({error:'ADMIN_SCORE_CODE is missing.'},503);
@@ -65,6 +74,7 @@ async function teamEditor(request,env){
 export default{
   async fetch(request,env,ctx){
     const path=new URL(request.url).pathname;
+    if(path==='/api/admin/verify')return verifyAdmin(request,env);
     if(path==='/api/admin/teams')return teamEditor(request,env);
     return app.fetch(request,env,ctx);
   }
