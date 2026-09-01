@@ -25,11 +25,18 @@ async function eventRosters(request,env){
   }catch(e){return json({error:String(e?.message||e)},502)}
 }
 
+async function findCornholeEvent(env){
+  const exact=await sb(env,'olympic_events?select=id,notion_page_id,event,event_key,event_number&event_key=eq.cornhole&limit=1');
+  if(exact[0])return exact[0];
+  const named=await sb(env,'olympic_events?select=id,notion_page_id,event,event_key,event_number&event=ilike.*cornhole*&order=event_number.asc&limit=1');
+  return named[0]||null;
+}
+
 async function cornholeTeams(request,env){
   if(request.method!=='GET')return json({error:'Method not allowed'},405);
   try{
-    const events=await sb(env,'olympic_events?select=id,event,event_key&event_key=eq.cornhole&limit=1'),event=events[0];
-    if(!event)return json({error:'Cornhole event not found.'},404);
+    const event=await findCornholeEvent(env);
+    if(!event)return json({error:'Cornhole event not found in Olympic Events.'},404);
     const [pairs,people]=await Promise.all([
       sb(env,`event_pairs?select=id,pair_number,olympic_team,participant_1_id,participant_2_id,seed&event_id=eq.${event.id}&seed=not.is.null&order=seed.asc`),
       sb(env,'participants?select=id,participant,team')
@@ -39,7 +46,7 @@ async function cornholeTeams(request,env){
       const a=byId.get(p.participant_1_id),b=byId.get(p.participant_2_id);
       return{id:p.id,seed:Number(p.seed),pairNumber:p.pair_number,olympicTeam:p.olympic_team,player1:a?.participant||'',player2:b?.participant||'',players:[a?.participant,b?.participant].filter(Boolean).join(' + ')};
     }).sort((a,b)=>a.seed-b.seed);
-    return json({ok:true,event:{key:event.event_key,name:event.event},teams,count:teams.length,source:'event_pairs'});
+    return json({ok:true,event:{id:event.notion_page_id,key:event.event_key,name:event.event},teams,count:teams.length,source:'event_pairs'});
   }catch(e){return json({error:String(e?.message||e)},502)}
 }
 
