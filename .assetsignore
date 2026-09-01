@@ -1,4 +1,5 @@
 worker.js
+worker-entry.js
 wrangler.jsonc
 functions/
 README.md
