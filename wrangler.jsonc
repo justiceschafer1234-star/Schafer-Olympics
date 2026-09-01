@@ -3,6 +3,15 @@
   "name": "schafer-olympics",
   "compatibility_date": "2026-08-29",
   "main": "./worker-supabase.js",
+  "secrets": {
+    "required": [
+      "SUPABASE_URL",
+      "SUPABASE_SECRET_KEY",
+      "NOTION_API_TOKEN",
+      "ADMIN_SCORE_CODE",
+      "DISCORD_WEBHOOK_URL"
+    ]
+  },
   "assets": {
     "directory": ".",
     "binding": "ASSETS",
