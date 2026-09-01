@@ -1,7 +1,11 @@
+.git/
+.wrangler/
+*.map
 worker.js
 worker-entry.js
 worker-supabase.js
 worker-team-editor.js
+worker-event-rosters.js
 supabase/
 wrangler.jsonc
 functions/
