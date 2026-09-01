@@ -6,6 +6,9 @@
   <meta name="color-scheme" content="light">
   <title>Schafer Olympics — Wiffle Ball</title>
   <link rel="stylesheet" href="/cornhole-tournament.css?v=20260901-wiffle1">
+  <style>
+    .bracket.wiffle{grid-template-columns:minmax(250px,520px);min-width:0}.bracket.wiffle .round{min-width:0}.seed-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}.seed-actions .score-sheet__save{width:auto;min-width:160px;margin-top:0}.seed-actions .score-sheet__status{margin-top:0;min-height:0;color:#687286}@media(max-width:700px){.bracket.wiffle{grid-template-columns:minmax(215px,1fr)}.seed-actions .score-sheet__save{width:100%}}
+  </style>
 </head>
 <body>
   <main class="page-shell">
@@ -45,12 +48,12 @@
 
       <div class="bracket-group">
         <h3>Semifinals</h3>
-        <div class="bracket-scroll"><div id="semifinals" class="bracket winners"></div></div>
+        <div class="bracket-scroll"><div id="semifinals" class="bracket wiffle"></div></div>
       </div>
 
       <div class="bracket-group finals-group">
         <h3>Medal Games</h3>
-        <div class="bracket-scroll"><div id="medal-games" class="bracket winners"></div></div>
+        <div class="bracket-scroll"><div id="medal-games" class="bracket wiffle"></div></div>
       </div>
 
       <div class="bracket-group finals-group">
