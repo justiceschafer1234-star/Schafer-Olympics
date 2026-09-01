@@ -8,13 +8,13 @@
   let scoreData=null;
   let detail=null;
   let openRow=null;
-  const TOURNAMENT_ASSET_VERSION='2026-09-01-standalone-cornhole-1';
+  const TOURNAMENT_ASSET_VERSION='2026-09-01-standalone-tournaments-2';
 
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const teamClass={'Team Red':'team-red','Team Blue':'team-blue','Team Green':'team-green','Team Gold':'team-gold'};
   const teamShort=t=>String(t||'').replace('Team ','');
   const tournamentPath=name=>{const n=String(name||'').toLowerCase();if(n.includes('cornhole'))return'/cornhole-tournament.html';if(n.includes('adult soccer'))return'/adult-soccer-tournament.html';if(n.includes('wiffle ball'))return'/wiffle-ball-tournament.html';return''};
-  const isCornhole=name=>String(name||'').toLowerCase().includes('cornhole');
+  const isStandaloneTournament=name=>{const n=String(name||'').toLowerCase();return n.includes('cornhole')||n.includes('wiffle ball')};
   const tournamentSrc=path=>`${path}?${document.body.classList.contains('control-mode')?'control=1':'view=1'}&v=${encodeURIComponent(TOURNAMENT_ASSET_VERSION)}`;
   const openStandaloneTournament=path=>{window.location.href=tournamentSrc(path)};
   const isTeamEvent=p=>/team/i.test(String(p?.Format||''));
@@ -75,14 +75,14 @@
 
   async function openByTitle(title){
     const directPath=tournamentPath(title);
-    if(isCornhole(title)&&directPath){openStandaloneTournament(directPath);return}
+    if(isStandaloneTournament(title)&&directPath){openStandaloneTournament(directPath);return}
     try{
       const d=await getScores(true);
       const row=(d.rows||[]).find(r=>String(r.properties?.Event||'').trim()===String(title||'').trim());
       if(!row)return;
       openRow=row;
       const p=row.properties||{},path=tournamentPath(p.Event),st=p.Status||'Not Started',box=ensureDetail();
-      if(isCornhole(p.Event)&&path){openStandaloneTournament(path);return}
+      if(isStandaloneTournament(p.Event)&&path){openStandaloneTournament(path);return}
       grid.hidden=true;
       const header=grid.parentElement.querySelector('.panel__header');if(header)header.hidden=true;
       box.hidden=false;
@@ -111,9 +111,8 @@
     grid.querySelectorAll('.event-card').forEach(card=>{
       if(card.dataset.gamedayReady==='1')return;
       card.dataset.gamedayReady='1';card.classList.add('event-card--clickable');card.setAttribute('role','button');card.tabIndex=0;
-      const title=card.querySelector('.event-title')?.textContent?.trim()||'';
-      const directCornhole=isCornhole(title);
-      const hint=document.createElement('div');hint.className='gameday-event-open';hint.innerHTML=`${directCornhole?'Open Cornhole Page':tournamentPath(title)?'Live bracket':'Scoring & results'} <span>→</span>`;card.appendChild(hint);
+      const title=card.querySelector('.event-title')?.textContent?.trim()||'',path=tournamentPath(title),standalone=isStandaloneTournament(title);
+      const hint=document.createElement('div');hint.className='gameday-event-open';hint.innerHTML=`${standalone&&path?`Open ${title} Page`:path?'Live bracket':'Scoring & results'} <span>→</span>`;card.appendChild(hint);
       card.addEventListener('click',()=>openByTitle(title));
       card.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openByTitle(title)}});
     });
