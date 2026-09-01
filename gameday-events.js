@@ -12,6 +12,7 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const teamClass={'Team Red':'team-red','Team Blue':'team-blue','Team Green':'team-green','Team Gold':'team-gold'};
   const tournamentPath=name=>{const n=String(name||'').toLowerCase();if(n.includes('cornhole'))return'/cornhole-tournament.html';if(n.includes('adult soccer'))return'/adult-soccer-tournament.html';if(n.includes('wiffle ball'))return'/wiffle-ball-tournament.html';return''};
+  const tournamentSrc=path=>`${path}${document.body.classList.contains('control-mode')?'?control=1':'?view=1'}`;
   const podium=p=>{const bits=[];const gold=Array.isArray(p['🥇 Team'])?p['🥇 Team'][0]:p['🥇 Team'];const silver=Array.isArray(p['🥈 Team'])?p['🥈 Team'][0]:p['🥈 Team'];const bronze=Array.isArray(p['🥉 Team'])?p['🥉 Team']:p['🥉 Team']?[p['🥉 Team']]:[];if(gold)bits.push(`🥇 ${esc(String(gold).replace('Team ',''))}`);if(silver)bits.push(`🥈 ${esc(String(silver).replace('Team ',''))}`);if(bronze.length)bits.push(`🥉 ${bronze.map(x=>esc(String(x).replace('Team ',''))).join(' + ')}`);return bits.join('<span>•</span>')};
 
   async function getScores(force=false){
@@ -46,6 +47,7 @@
   }
 
   function openAdmin(row){
+    if(!document.body.classList.contains('control-mode'))return;
     closeDetail();
     const adminTab=document.querySelector('[data-tab="admin"]');
     adminTab?.click();
@@ -69,12 +71,14 @@
       box.querySelector('[data-detail-result]').innerHTML=podium(p)?`<div class="gameday-event-podium">${podium(p)}</div>`:'<div class="gameday-event-pending">No final result entered yet.</div>';
       const action=box.querySelector('[data-detail-action]'),tour=box.querySelector('[data-detail-tournament]');
       if(path){
-        action.innerHTML='<p class="gameday-event-hint">Enter match scores directly in the live bracket below.</p>';
-        tour.hidden=false;tour.innerHTML=`<iframe class="gameday-tournament-frame" title="${esc(p.Event)} bracket" src="${path}"></iframe>`;
+        action.innerHTML=document.body.classList.contains('control-mode')?'<p class="gameday-event-hint">Enter match scores directly in the live bracket below.</p>':'';
+        tour.hidden=false;tour.innerHTML=`<iframe class="gameday-tournament-frame" title="${esc(p.Event)} bracket" src="${tournamentSrc(path)}"></iframe>`;
       }else{
         tour.hidden=true;tour.innerHTML='';
-        action.innerHTML=`<button type="button" class="save-score gameday-score-event">${podium(p)?'Edit Event Result':'Enter Event Result'}</button>`;
-        action.querySelector('button').addEventListener('click',()=>openAdmin(row));
+        if(document.body.classList.contains('control-mode')){
+          action.innerHTML=`<button type="button" class="save-score gameday-score-event">${podium(p)?'Edit Event Result':'Enter Event Result'}</button>`;
+          action.querySelector('button').addEventListener('click',()=>openAdmin(row));
+        }else action.innerHTML='';
       }
       compactBoard(box.querySelector('[data-detail-board]'),d.standings||[]);
       box.scrollIntoView({behavior:'smooth',block:'start'});
