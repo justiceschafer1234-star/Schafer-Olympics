@@ -8,11 +8,12 @@
   let scoreData=null;
   let detail=null;
   let openRow=null;
+  const TOURNAMENT_ASSET_VERSION='2026-09-01-10team';
 
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const teamClass={'Team Red':'team-red','Team Blue':'team-blue','Team Green':'team-green','Team Gold':'team-gold'};
   const tournamentPath=name=>{const n=String(name||'').toLowerCase();if(n.includes('cornhole'))return'/cornhole-tournament.html';if(n.includes('adult soccer'))return'/adult-soccer-tournament.html';if(n.includes('wiffle ball'))return'/wiffle-ball-tournament.html';return''};
-  const tournamentSrc=path=>`${path}${document.body.classList.contains('control-mode')?'?control=1':'?view=1'}`;
+  const tournamentSrc=path=>`${path}?${document.body.classList.contains('control-mode')?'control=1':'view=1'}&v=${encodeURIComponent(TOURNAMENT_ASSET_VERSION)}`;
   const podium=p=>{const bits=[];const gold=Array.isArray(p['🥇 Team'])?p['🥇 Team'][0]:p['🥇 Team'];const silver=Array.isArray(p['🥈 Team'])?p['🥈 Team'][0]:p['🥈 Team'];const bronze=Array.isArray(p['🥉 Team'])?p['🥉 Team']:p['🥉 Team']?[p['🥉 Team']]:[];if(gold)bits.push(`🥇 ${esc(String(gold).replace('Team ',''))}`);if(silver)bits.push(`🥈 ${esc(String(silver).replace('Team ',''))}`);if(bronze.length)bits.push(`🥉 ${bronze.map(x=>esc(String(x).replace('Team ',''))).join(' + ')}`);return bits.join('<span>•</span>')};
 
   async function getScores(force=false){
