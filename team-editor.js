@@ -1,250 +1,28 @@
 (()=>{
-  const TEAMS=['Team Red','Team Blue','Team Green','Team Gold'];
-  const STORAGE_KEY='schaferOlympicsControlCode';
-  const tab=document.querySelector('[data-tab="teams"]');
-  const panel=document.querySelector('[data-panel="teams"]');
-  const grid=document.querySelector('#team-editor-grid');
-  const summary=document.querySelector('#team-editor-summary');
-  const message=document.querySelector('#team-editor-message');
-  const saveButton=document.querySelector('#team-editor-save');
-  const balanceButton=document.querySelector('#team-editor-balance');
-  const clearButton=document.querySelector('#team-editor-clear');
-  const filter=document.querySelector('#team-editor-filter');
-  if(!tab||!panel||!grid)return;
-
-  let participants=[];
-  let events=[];
-  let loaded=false;
-  let dirty=false;
-  let eventEligible=[];
-  let eventPairs=[];
-
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const shuffle=a=>{const x=[...a];for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[x[i],x[j]]=[x[j],x[i]];}return x;};
-  const divisionLabel=p=>(p.divisions||[]).join(' / ')||'—';
-
-  function openPanel(){
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('is-active'));
-    document.querySelectorAll('.tab-panel').forEach(p=>{p.hidden=true;p.classList.remove('is-active')});
-    tab.classList.add('is-active');
-    panel.hidden=false;
-    panel.classList.add('is-active');
-    if(!loaded)load();
-  }
-
-  async function api(action,extra={}){
-    const code=sessionStorage.getItem(STORAGE_KEY)||'';
-    if(!code)throw new Error('Control View is locked.');
-    const controller=new AbortController();
-    const timeout=setTimeout(()=>controller.abort(),10000);
-    try{
-      const response=await fetch('/api/admin/teams',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,code,...extra}),signal:controller.signal});
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok||!data.ok)throw new Error(data.error||'Team editor request failed.');
-      return data;
-    }catch(err){
-      if(err?.name==='AbortError')throw new Error('Team editor request timed out. Refresh and try again.');
-      throw err;
-    }finally{clearTimeout(timeout)}
-  }
-
-  function counts(){
-    return TEAMS.map(team=>{
-      const people=participants.filter(p=>p.team===team);
-      const men=people.filter(p=>(p.divisions||[]).includes('Man')).length;
-      const women=people.filter(p=>(p.divisions||[]).includes('Woman')).length;
-      const kids=people.filter(p=>(p.divisions||[]).includes('Kid')).length;
-      return {team,total:people.length,men,women,kids};
-    });
-  }
-
-  function renderSummary(){
-    const assigned=participants.filter(p=>p.team).length;
-    const cards=counts().map(c=>`<div class="team-editor-card ${c.team.toLowerCase().replaceAll(' ','-')}"><strong>${esc(c.team.replace('Team ',''))}</strong><span>${c.total}</span><small>${c.men} men · ${c.women} women · ${c.kids} kids</small></div>`).join('');
-    summary.innerHTML=`<div class="team-editor-countline"><strong>${assigned}/${participants.length} assigned</strong><span>${participants.length-assigned} unassigned</span></div><div class="team-editor-cards">${cards}</div>`;
-  }
-
-  function render(){
-    renderSummary();
-    const mode=filter?.value||'all';
-    const shown=participants.filter(p=>mode==='unassigned'?!p.team:mode==='assigned'?!!p.team:true);
-    if(!shown.length){grid.innerHTML='<div class="team-editor-empty">No participants match this filter.</div>';return;}
-    grid.innerHTML=shown.map(p=>`<div class="team-editor-row" data-key="${esc(p.key)}"><div><strong>${esc(p.name)}</strong><small>${esc(divisionLabel(p))}${p.key?` · ${esc(p.key)}`:''}</small></div><select aria-label="Team for ${esc(p.name)}"><option value="">Unassigned</option>${TEAMS.map(t=>`<option value="${esc(t)}" ${p.team===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>`).join('');
-    grid.querySelectorAll('.team-editor-row select').forEach(select=>select.addEventListener('change',()=>{
-      const row=select.closest('.team-editor-row');
-      const p=participants.find(x=>x.key===row.dataset.key);
-      if(p)p.team=select.value;
-      dirty=true;
-      setMessage('Unsaved changes','warn');
-      renderSummary();
-    }));
-  }
-
-  function setMessage(text,type=''){
-    message.textContent=text||'';
-    message.className='team-editor-message'+(type?` ${type}`:'');
-  }
-
-  function injectEventPairEditor(){
-    if(document.querySelector('#event-team-editor'))return;
-    const section=document.createElement('section');
-    section.id='event-team-editor';
-    section.className='panel event-team-editor';
-    section.innerHTML=`
-      <div class="panel__header panel__header--wrap">
-        <div><p class="section-kicker">Event setup</p><h2>Event Team Editor</h2><p class="team-editor-note">Build two-person event teams. A pair can only contain people from the same Olympic team, and both people must be registered for the selected event.</p></div>
-        <div class="team-editor-actions"><button id="event-pair-add" class="refresh" type="button">＋ Add Pair</button><button id="event-pair-clear" class="refresh" type="button">Clear Pairs</button><button id="event-pair-save" class="save-score" type="button">Save Event Pairs</button></div>
-      </div>
-      <div class="event-team-toolbar"><label><span>Event</span><select id="event-team-select"><option value="">Choose an event…</option></select></label><span id="event-team-message" class="team-editor-message"></span></div>
-      <div id="event-team-summary" class="event-team-summary">Choose an event to begin.</div>
-      <div id="event-pair-grid" class="event-pair-grid"></div>`;
-    panel.appendChild(section);
-    const style=document.createElement('style');
-    style.id='event-team-editor-style';
-    style.textContent=`.event-team-editor{margin-top:18px}.event-team-toolbar{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin:16px 0}.event-team-toolbar label{display:grid;gap:6px;min-width:min(100%,360px);font-size:.82rem;font-weight:850}.event-team-toolbar select,.event-pair select{min-height:42px;padding:8px 10px;border:1px solid #cbd7e4;border-radius:9px;background:#fff;font:inherit}.event-team-summary{padding:11px 13px;background:#f5f8fc;border-radius:11px;color:#65758a;font-size:.9rem}.event-pair-grid{display:grid;gap:10px;margin-top:12px}.event-pair{display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr) auto;gap:9px;align-items:center;padding:12px;border:1px solid #dbe3ed;border-radius:12px;background:#fff}.event-pair__number{font-weight:950;white-space:nowrap}.event-pair__team{font-size:.78rem;font-weight:900;padding:6px 8px;border-radius:999px;background:#eef3f8;color:#345b82;white-space:nowrap}.event-pair__remove{border:0;background:#f5f8fc;border-radius:9px;min-height:38px;padding:7px 10px;cursor:pointer;font-weight:850}.event-pair__plus{font-weight:950;color:#8190a2}.event-pair-empty{padding:15px;border-radius:11px;background:#f5f8fc;color:#65758a}@media(max-width:760px){.event-pair{grid-template-columns:1fr}.event-pair__plus{display:none}.event-pair__remove{justify-self:start}}`;
-    document.head.appendChild(style);
-    const eventSelect=section.querySelector('#event-team-select');
-    eventSelect.innerHTML='<option value="">Choose an event…</option>'+events.map(e=>`<option value="${esc(e.key)}">#${e.number??'–'} ${esc(e.name)}${String(e.format||'').toLowerCase().includes('pair')?' · Pairs':''}</option>`).join('');
-    eventSelect.addEventListener('change',loadEventPairs);
-    section.querySelector('#event-pair-add').addEventListener('click',()=>{
-      if(!eventSelect.value){setEventMessage('Choose an event first.','error');return;}
-      eventPairs.push({member1Key:'',member2Key:''});
-      renderEventPairs();
-    });
-    section.querySelector('#event-pair-clear').addEventListener('click',async()=>{
-      if(!eventSelect.value)return;
-      if(!confirm('Clear all saved pairs for this event?'))return;
-      try{
-        await api('saveEventPairs',{eventKey:eventSelect.value,pairs:[]});
-        eventPairs=[];setEventMessage('✓ Event pairs cleared','success');renderEventPairs();
-      }catch(err){setEventMessage(err.message,'error')}
-    });
-    section.querySelector('#event-pair-save').addEventListener('click',saveEventPairs);
-  }
-
-  function setEventMessage(text,type=''){
-    const el=document.querySelector('#event-team-message');
-    if(!el)return;el.textContent=text||'';el.className='team-editor-message'+(type?` ${type}`:'');
-  }
-
-  function groupedOptions(selected='',allowedTeam=''){
-    const groups=TEAMS.map(team=>[team,eventEligible.filter(p=>p.team===team)]).filter(([,xs])=>xs.length);
-    return '<option value="">— Choose person —</option>'+groups.filter(([team])=>!allowedTeam||team===allowedTeam).map(([team,people])=>`<optgroup label="${esc(team)}">${people.map(p=>`<option value="${esc(p.key)}" ${p.key===selected?'selected':''}>${esc(p.name)}</option>`).join('')}</optgroup>`).join('');
-  }
-
-  function renderEventPairs(){
-    const box=document.querySelector('#event-pair-grid');
-    const summaryBox=document.querySelector('#event-team-summary');
-    if(!box||!summaryBox)return;
-    const assigned=eventEligible.length;
-    const byKey=new Map(eventEligible.map(p=>[p.key,p]));
-    summaryBox.textContent=`${assigned} registered participant${assigned===1?'':'s'} with an Olympic team assignment · ${eventPairs.length} pair${eventPairs.length===1?'':'s'}`;
-    if(!eventPairs.length){box.innerHTML='<div class="event-pair-empty">No pairs yet. Press “Add Pair” to create one.</div>';return;}
-    box.innerHTML=eventPairs.map((pair,i)=>{
-      const a=byKey.get(pair.member1Key)||null,b=byKey.get(pair.member2Key)||null,team=a?.team||b?.team||'';
-      return `<div class="event-pair" data-index="${i}"><span class="event-pair__number">Pair ${i+1}</span><select data-member="1" aria-label="First person for pair ${i+1}">${groupedOptions(a?.key||'',team)}</select><span class="event-pair__plus">+</span><select data-member="2" aria-label="Second person for pair ${i+1}">${groupedOptions(b?.key||'',team)}</select><span class="event-pair__team">${esc(team||'Pick a team')}</span><button class="event-pair__remove" type="button">Remove</button></div>`;
-    }).join('');
-    box.querySelectorAll('.event-pair').forEach(row=>{
-      const i=Number(row.dataset.index),sels=row.querySelectorAll('select');
-      sels.forEach(sel=>sel.addEventListener('change',()=>{
-        const key=sel.value,person=byKey.get(key)||null,which=sel.dataset.member==='1'?'member1Key':'member2Key',other=which==='member1Key'?'member2Key':'member1Key';
-        eventPairs[i][which]=key;
-        const otherPerson=byKey.get(eventPairs[i][other])||null;
-        if(person&&otherPerson&&person.team!==otherPerson.team)eventPairs[i][other]='';
-        const keys=eventPairs.flatMap(p=>[p.member1Key,p.member2Key]).filter(Boolean);
-        if(key&&keys.filter(x=>x===key).length>1){eventPairs[i][which]='';setEventMessage('A person can only be used once in an event.','error');}
-        else setEventMessage('Unsaved event pair changes','warn');
-        renderEventPairs();
-      }));
-      row.querySelector('.event-pair__remove').addEventListener('click',()=>{eventPairs.splice(i,1);setEventMessage('Unsaved event pair changes','warn');renderEventPairs();});
-    });
-  }
-
-  async function loadEventPairs(){
-    const select=document.querySelector('#event-team-select'),box=document.querySelector('#event-pair-grid');
-    const key=select?.value||'';
-    eventEligible=[];eventPairs=[];setEventMessage('');
-    if(!key){if(box)box.innerHTML='';const s=document.querySelector('#event-team-summary');if(s)s.textContent='Choose an event to begin.';return;}
-    if(box)box.innerHTML='<div class="event-pair-empty">Loading event pairs…</div>';
-    try{
-      const data=await api('eventPairs',{eventKey:key});
-      eventEligible=data.eligible||[];
-      eventPairs=(data.pairs||[]).map(p=>({member1Key:p.member1Key||'',member2Key:p.member2Key||''}));
-      renderEventPairs();
-    }catch(err){if(box)box.innerHTML=`<div class="event-pair-empty">${esc(err.message)}</div>`;setEventMessage(err.message,'error')}
-  }
-
-  async function saveEventPairs(){
-    const select=document.querySelector('#event-team-select'),button=document.querySelector('#event-pair-save');
-    if(!select?.value){setEventMessage('Choose an event first.','error');return;}
-    if(eventPairs.some(p=>!p.member1Key||!p.member2Key)){setEventMessage('Finish both people in every pair before saving.','error');return;}
-    button.disabled=true;setEventMessage('Saving event pairs…');
-    try{
-      await api('saveEventPairs',{eventKey:select.value,pairs:eventPairs});
-      setEventMessage(`✓ ${eventPairs.length} pair${eventPairs.length===1?'':'s'} saved`,'success');
-      await loadEventPairs();
-      setEventMessage(`✓ ${eventPairs.length} pair${eventPairs.length===1?'':'s'} saved`,'success');
-    }catch(err){setEventMessage(err.message,'error')}
-    finally{button.disabled=false}
-  }
-
-  async function load(){
-    loaded=true;
-    grid.innerHTML='<div class="team-editor-empty">Loading participants…</div>';
-    try{
-      const data=await api('list');
-      participants=data.participants||[];
-      events=data.events||[];
-      dirty=false;
-      setMessage('');
-      render();
-      injectEventPairEditor();
-    }catch(err){
-      loaded=false;
-      grid.innerHTML=`<div class="team-editor-empty error-text">${esc(err.message)}</div>`;
-      setMessage(err.message,'error');
-    }
-  }
-
-  function balancedAssignments(){
-    const groups=new Map();
-    participants.forEach(p=>{
-      const key=(p.divisions||[]).slice().sort().join('|')||'Other';
-      if(!groups.has(key))groups.set(key,[]);
-      groups.get(key).push(p);
-    });
-    const totals=Object.fromEntries(TEAMS.map(t=>[t,0]));
-    for(const people of groups.values()){
-      const mixed=shuffle(people);
-      mixed.forEach(p=>{
-        const lowest=Math.min(...TEAMS.map(t=>totals[t]));
-        const choices=shuffle(TEAMS.filter(t=>totals[t]===lowest));
-        p.team=choices[0];totals[p.team]++;
-      });
-    }
-  }
-
-  tab.addEventListener('click',openPanel);
-  filter?.addEventListener('change',render);
-  balanceButton?.addEventListener('click',()=>{
-    if(!participants.length)return;
-    if(!confirm('Auto-balance everyone across Red, Blue, Green, and Gold? This changes the draft only until you press Save Teams.'))return;
-    balancedAssignments();dirty=true;setMessage('Balanced draft ready — press Save Teams.','warn');render();
-  });
-  clearButton?.addEventListener('click',()=>{
-    if(!participants.length||!confirm('Set every participant to Unassigned? This changes the draft only until you press Save Teams.'))return;
-    participants.forEach(p=>p.team='');dirty=true;setMessage('All participants unassigned in draft — press Save Teams.','warn');render();
-  });
-  saveButton?.addEventListener('click',async()=>{
-    if(!participants.length)return;
-    saveButton.disabled=true;setMessage('Saving teams…');
-    try{
-      await api('save',{assignments:participants.map(p=>({participantKey:p.key,team:p.team||''}))});
-      dirty=false;setMessage('✓ Teams saved','success');renderSummary();
-      const selected=document.querySelector('#event-team-select')?.value;if(selected)await loadEventPairs();
-    }catch(err){setMessage(err.message,'error')}
-    finally{saveButton.disabled=false}
-  });
-
-  window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+const TEAMS=['Team Red','Team Blue','Team Green','Team Gold'],STORAGE_KEY='schaferOlympicsControlCode';
+const tab=document.querySelector('[data-tab="teams"]'),panel=document.querySelector('[data-panel="teams"]'),grid=document.querySelector('#team-editor-grid'),summary=document.querySelector('#team-editor-summary'),message=document.querySelector('#team-editor-message'),saveButton=document.querySelector('#team-editor-save'),balanceButton=document.querySelector('#team-editor-balance'),clearButton=document.querySelector('#team-editor-clear'),filter=document.querySelector('#team-editor-filter');if(!tab||!panel||!grid)return;
+let participants=[],events=[],loaded=false,dirty=false,eventEligible=[],eventPairs=[],pendingPick=null;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const shuffle=a=>{const x=[...a];for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[x[i],x[j]]=[x[j],x[i]]}return x};
+async function api(action,extra={}){const code=sessionStorage.getItem(STORAGE_KEY)||'';if(!code)throw new Error('Control View is locked.');const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);try{const r=await fetch('/api/admin/teams',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,code,...extra}),signal:controller.signal}),d=await r.json().catch(()=>({}));if(!r.ok||!d.ok){const e=new Error(d.error||'Team editor request failed.');e.data=d;throw e}return d}catch(e){if(e?.name==='AbortError')throw new Error('Team editor request timed out. Refresh and try again.');throw e}finally{clearTimeout(timeout)}}
+function setMessage(t,type=''){message.textContent=t||'';message.className='team-editor-message'+(type?` ${type}`:'')}
+function counts(){return TEAMS.map(team=>{const people=participants.filter(p=>p.team===team);return{team,total:people.length,men:people.filter(p=>(p.divisions||[]).includes('Man')).length,women:people.filter(p=>(p.divisions||[]).includes('Woman')).length,kids:people.filter(p=>(p.divisions||[]).includes('Kid')).length}})}
+function renderSummary(){const assigned=participants.filter(p=>p.team).length;summary.innerHTML=`<div class="team-editor-countline"><strong>${assigned}/${participants.length} assigned</strong><span>${participants.length-assigned} unassigned</span></div><div class="team-editor-cards">${counts().map(c=>`<div class="team-editor-card ${c.team.toLowerCase().replaceAll(' ','-')}"><strong>${esc(c.team.replace('Team ',''))}</strong><span>${c.total}</span><small>${c.men} men · ${c.women} women · ${c.kids} kids</small></div>`).join('')}</div>`}
+function render(){renderSummary();const mode=filter?.value||'all',shown=participants.filter(p=>mode==='unassigned'?!p.team:mode==='assigned'?!!p.team:true);grid.innerHTML=shown.length?shown.map(p=>`<div class="team-editor-row" data-key="${esc(p.key)}"><div><strong>${esc(p.name)}</strong><small>${esc((p.divisions||[]).join(' / ')||'—')}</small></div><select><option value="">Unassigned</option>${TEAMS.map(t=>`<option ${p.team===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>`).join(''):'<div class="team-editor-empty">No participants match this filter.</div>';grid.querySelectorAll('select').forEach(s=>s.onchange=()=>{const p=participants.find(x=>x.key===s.closest('.team-editor-row').dataset.key);if(p)p.team=s.value;dirty=true;setMessage('Unsaved changes','warn');renderSummary()})}
+function openPanel(){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('is-active'));document.querySelectorAll('.tab-panel').forEach(p=>{p.hidden=true;p.classList.remove('is-active')});tab.classList.add('is-active');panel.hidden=false;panel.classList.add('is-active');if(!loaded)load()}
+function setEventMessage(t,type=''){const e=document.querySelector('#event-team-message');if(e){e.textContent=t||'';e.className='team-editor-message'+(type?` ${type}`:'')}}
+function usedKeys(){return new Set(eventPairs.flatMap(p=>[p.member1Key,p.member2Key]).filter(Boolean))}
+function personByKey(k){return eventEligible.find(p=>p.key===k)}
+function addPick(key){const p=personByKey(key);if(!p)return;if(usedKeys().has(key)){setEventMessage('That person is already paired.','error');return}if(!pendingPick){pendingPick=key;setEventMessage(`Selected ${p.name}. Pick another ${p.team.replace('Team ','')} teammate.`,'warn');renderEventPairs();return}const first=personByKey(pendingPick);if(!first||first.team!==p.team){pendingPick=key;setEventMessage(`Now select another ${p.team.replace('Team ','')} teammate.`,'warn');renderEventPairs();return}eventPairs.push({id:null,member1Key:pendingPick,member2Key:key,seed:null});pendingPick=null;setEventMessage('Pair added — save when finished.','warn');renderEventPairs()}
+function injectEditor(){if(document.querySelector('#event-team-editor'))return;const s=document.createElement('section');s.id='event-team-editor';s.className='panel event-team-editor';s.innerHTML=`<div class="panel__header panel__header--wrap"><div><p class="section-kicker">Event setup</p><h2>Event Team Editor</h2><p class="team-editor-note">Tap two people from the same Olympic team to make a pair. Used people disappear from the available list.</p></div><div class="team-editor-actions"><button id="event-pair-undo" class="refresh" type="button">Undo Last Pair</button><button id="event-pair-clear" class="refresh" type="button">Clear Pairs</button><button id="event-pair-save" class="save-score" type="button">Save Event Pairs</button></div></div><div class="event-team-toolbar"><label><span>Event</span><select id="event-team-select"><option value="">Choose an event…</option></select></label><span id="event-team-message" class="team-editor-message"></span></div><div id="event-team-summary" class="event-team-summary">Choose an event to begin.</div><div id="event-pair-picker"></div><div id="event-pair-grid" class="event-pair-grid"></div><div id="cornhole-seeding"></div>`;panel.appendChild(s);
+const st=document.createElement('style');st.textContent=`.event-team-editor{margin-top:18px}.event-team-toolbar{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin:16px 0}.event-team-toolbar label{display:grid;gap:6px;min-width:min(100%,360px);font-size:.82rem;font-weight:850}.event-team-toolbar select,.seed-row select{min-height:42px;padding:8px 10px;border:1px solid #cbd7e4;border-radius:9px;background:#fff;font:inherit}.event-team-summary{padding:11px 13px;background:#f5f8fc;border-radius:11px;color:#65758a;font-size:.9rem}.pair-team{margin:14px 0;border:1px solid #dbe3ed;border-radius:13px;overflow:hidden}.pair-team h3{margin:0;padding:10px 12px;background:#f5f8fc;font-size:.9rem}.pair-people{display:flex;gap:8px;flex-wrap:wrap;padding:10px}.pair-person{border:1px solid #cbd7e4;background:#fff;border-radius:999px;padding:9px 12px;font-weight:800;cursor:pointer}.pair-person.selected{outline:3px solid #345b82}.pair-team-empty{padding:10px 12px;color:#7a8797;font-size:.85rem}.event-pair-grid{display:grid;gap:8px;margin-top:12px}.event-pair{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:11px 12px;border:1px solid #dbe3ed;border-radius:12px}.event-pair strong{min-width:58px}.event-pair__team{font-size:.78rem;font-weight:900;padding:5px 8px;border-radius:999px;background:#eef3f8}.event-pair__remove{margin-left:auto;border:0;background:#f5f8fc;border-radius:9px;padding:8px 10px;font-weight:850;cursor:pointer}.cornhole-seeding{margin-top:20px;padding-top:18px;border-top:2px solid #e5ebf2}.seed-grid{display:grid;gap:8px;margin:12px 0}.seed-row{display:grid;grid-template-columns:75px 1fr;align-items:center;gap:10px}.seed-row strong{font-size:.9rem}.seed-warning{padding:10px 12px;border-radius:10px;background:#fff7e8;margin:10px 0;font-size:.88rem}.seed-save{margin-top:8px}@media(max-width:650px){.seed-row{grid-template-columns:65px 1fr}.pair-person{padding:11px 13px}.event-pair__remove{margin-left:0}}`;document.head.appendChild(st);
+const sel=s.querySelector('#event-team-select');sel.innerHTML='<option value="">Choose an event…</option>'+events.map(e=>`<option value="${esc(e.key)}">#${e.number??'–'} ${esc(e.name)}</option>`).join('');sel.onchange=loadEventPairs;s.querySelector('#event-pair-undo').onclick=()=>{if(pendingPick){pendingPick=null}else eventPairs.pop();setEventMessage('Unsaved event pair changes','warn');renderEventPairs()};s.querySelector('#event-pair-clear').onclick=async()=>{if(!sel.value||!confirm('Clear all saved pairs for this event?'))return;try{await api('saveEventPairs',{eventKey:sel.value,pairs:[]});eventPairs=[];pendingPick=null;setEventMessage('✓ Event pairs cleared','success');renderEventPairs()}catch(e){setEventMessage(e.message,'error')}};s.querySelector('#event-pair-save').onclick=saveEventPairs}
+function renderEventPairs(){const box=document.querySelector('#event-pair-grid'),picker=document.querySelector('#event-pair-picker'),sum=document.querySelector('#event-team-summary');if(!box||!picker||!sum)return;const used=usedKeys(),remaining=eventEligible.length-used.size;sum.innerHTML=`<strong>${used.size}/${eventEligible.length} matched</strong> · ${remaining} remaining · ${eventPairs.length} pair${eventPairs.length===1?'':'s'}`;picker.innerHTML=TEAMS.map(team=>{const people=eventEligible.filter(p=>p.team===team&&!used.has(p.key)),selected=personByKey(pendingPick)?.team===team?pendingPick:null;return `<div class="pair-team"><h3>${esc(team)} — ${people.length} available</h3>${people.length?`<div class="pair-people">${people.map(p=>`<button type="button" class="pair-person ${selected===p.key?'selected':''}" data-key="${esc(p.key)}">${esc(p.name)}</button>`).join('')}</div>`:'<div class="pair-team-empty">Everyone on this team is matched.</div>'}</div>`}).join('');picker.querySelectorAll('.pair-person').forEach(b=>b.onclick=()=>addPick(b.dataset.key));box.innerHTML=eventPairs.length?eventPairs.map((p,i)=>{const a=personByKey(p.member1Key),b=personByKey(p.member2Key);return `<div class="event-pair"><strong>Pair ${i+1}</strong><span>${esc(a?.name||'')}</span><span>+</span><span>${esc(b?.name||'')}</span><span class="event-pair__team">${esc(a?.team||'')}</span><button type="button" class="event-pair__remove" data-i="${i}">Remove</button></div>`}).join(''):'<div class="pair-team-empty">No pairs yet. Tap two teammates above.</div>';box.querySelectorAll('.event-pair__remove').forEach(b=>b.onclick=()=>{eventPairs.splice(Number(b.dataset.i),1);pendingPick=null;setEventMessage('Unsaved event pair changes','warn');renderEventPairs()});renderSeeding()}
+async function loadEventPairs(){const sel=document.querySelector('#event-team-select'),key=sel?.value||'';eventEligible=[];eventPairs=[];pendingPick=null;setEventMessage('');if(!key){document.querySelector('#event-pair-picker').innerHTML='';document.querySelector('#event-pair-grid').innerHTML='';document.querySelector('#cornhole-seeding').innerHTML='';document.querySelector('#event-team-summary').textContent='Choose an event to begin.';return}try{const d=await api('eventPairs',{eventKey:key});eventEligible=d.eligible||[];eventPairs=(d.pairs||[]).map(p=>({id:p.id,member1Key:p.member1Key,member2Key:p.member2Key,seed:p.seed||null}));renderEventPairs()}catch(e){setEventMessage(e.message,'error')}}
+async function saveEventPairs(){const sel=document.querySelector('#event-team-select'),btn=document.querySelector('#event-pair-save');if(!sel?.value)return;if(pendingPick){setEventMessage('Finish the selected pair first.','error');return}btn.disabled=true;try{await api('saveEventPairs',{eventKey:sel.value,pairs:eventPairs});await loadEventPairs();setEventMessage(`✓ ${eventPairs.length} pair${eventPairs.length===1?'':'s'} saved`,'success')}catch(e){setEventMessage(e.message,'error')}finally{btn.disabled=false}}
+function renderSeeding(){const host=document.querySelector('#cornhole-seeding'),sel=document.querySelector('#event-team-select');if(!host)return;if(sel?.value!=='cornhole'){host.innerHTML='';return}if(!eventPairs.length||eventPairs.some(p=>!p.id)){host.innerHTML='<div class="cornhole-seeding"><h3>Cornhole Seeding</h3><p>Save the Cornhole pairs first, then assign seeds.</p></div>';return}const sorted=[...eventPairs].sort((a,b)=>(a.seed||99)-(b.seed||99));host.innerHTML=`<div class="cornhole-seeding"><p class="section-kicker">Control View only</p><h3>Cornhole Seeding</h3><p class="team-editor-note">You decide the seed for every saved pair. Seeds feed directly into the double-elimination bracket.</p><div class="seed-grid">${Array.from({length:eventPairs.length},(_,i)=>{const seed=i+1,p=sorted.find(x=>x.seed===seed);return `<label class="seed-row"><strong>Seed ${seed}</strong><select data-seed="${seed}"><option value="">Choose pair…</option>${eventPairs.map((x,j)=>{const a=personByKey(x.member1Key),b=personByKey(x.member2Key);return `<option value="${esc(x.id)}" ${p?.id===x.id?'selected':''}>Pair ${j+1}: ${esc(a?.name||'')} + ${esc(b?.name||'')} (${esc(a?.team?.replace('Team ','')||'')})</option>`}).join('')}</select></label>`}).join('')}</div><div class="seed-warning">If Cornhole has already started, reseeding requires confirmation and resets all Cornhole match results.</div><button id="cornhole-seed-save" class="save-score seed-save" type="button">Save & Seed Bracket</button><span id="cornhole-seed-message" class="team-editor-message"></span></div>`;host.querySelector('#cornhole-seed-save').onclick=saveSeeds}
+async function saveSeeds(){const selects=[...document.querySelectorAll('.seed-row select')],ids=selects.map(s=>s.value);if(ids.some(x=>!x)||new Set(ids).size!==ids.length){document.querySelector('#cornhole-seed-message').textContent='Choose each pair exactly once.';return}const seeds=selects.map(s=>({seed:Number(s.dataset.seed),pairId:s.value})),btn=document.querySelector('#cornhole-seed-save'),msg=document.querySelector('#cornhole-seed-message');btn.disabled=true;try{let d;try{d=await api('seedCornhole',{seeds,forceReset:false})}catch(e){if(e.data?.needsResetConfirmation){if(!confirm('Cornhole already has scores/results. Reseeding will RESET the entire Cornhole bracket. Continue?'))return;d=await api('seedCornhole',{seeds,forceReset:true})}else throw e}msg.textContent=`✓ Bracket seeded with ${d.seeded} teams`;const fresh=await api('eventPairs',{eventKey:'cornhole'});eventPairs=(fresh.pairs||[]).map(p=>({id:p.id,member1Key:p.member1Key,member2Key:p.member2Key,seed:p.seed||null}));renderEventPairs();document.querySelector('#cornhole-seed-message').textContent='✓ Bracket seeded'}catch(e){msg.textContent=e.message}finally{btn.disabled=false}}
+async function load(){loaded=true;grid.innerHTML='<div class="team-editor-empty">Loading participants…</div>';try{const d=await api('list');participants=d.participants||[];events=d.events||[];dirty=false;render();injectEditor()}catch(e){loaded=false;grid.innerHTML=`<div class="team-editor-empty error-text">${esc(e.message)}</div>`;setMessage(e.message,'error')}}
+function balancedAssignments(){const groups=new Map(),totals=Object.fromEntries(TEAMS.map(t=>[t,0]));participants.forEach(p=>{const k=(p.divisions||[]).slice().sort().join('|')||'Other';if(!groups.has(k))groups.set(k,[]);groups.get(k).push(p)});for(const people of groups.values())shuffle(people).forEach(p=>{const low=Math.min(...TEAMS.map(t=>totals[t])),choices=shuffle(TEAMS.filter(t=>totals[t]===low));p.team=choices[0];totals[p.team]++})}
+tab.addEventListener('click',openPanel);filter?.addEventListener('change',render);balanceButton?.addEventListener('click',()=>{if(participants.length&&confirm('Auto-balance everyone? Changes are only a draft until Save Teams.')){balancedAssignments();dirty=true;setMessage('Balanced draft ready — press Save Teams.','warn');render()}});clearButton?.addEventListener('click',()=>{if(participants.length&&confirm('Set every participant to Unassigned?')){participants.forEach(p=>p.team='');dirty=true;setMessage('All unassigned in draft — press Save Teams.','warn');render()}});saveButton?.addEventListener('click',async()=>{saveButton.disabled=true;try{await api('save',{assignments:participants.map(p=>({participantKey:p.key,team:p.team||''}))});dirty=false;setMessage('✓ Teams saved','success');renderSummary();if(document.querySelector('#event-team-select')?.value)await loadEventPairs()}catch(e){setMessage(e.message,'error')}finally{saveButton.disabled=false}});window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
 })();
