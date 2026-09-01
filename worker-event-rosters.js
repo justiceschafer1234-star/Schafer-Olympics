@@ -49,26 +49,25 @@ async function eventRosters(request,env){
 async function cornholeTeams(request,env){
   if(request.method!=='GET')return json({error:'Method not allowed'},405);
   try{
-    const event=await findEvent(env,{eventKey:'cornhole',nameLike:'cornhole'});
+    const event=await findEvent(env,{eventKey:'cornhole-tournament',nameLike:'cornhole'});
     if(!event)return json({error:'Cornhole event not found in Olympic Events.'},404);
-    const rows=await participantDetails(env,event.id);
-    const seeded=rows.filter(x=>x.seed!=null&&x.eventTeamNumber!=null);
+    const rows=(await participantDetails(env,event.id)).filter(x=>x.eventTeamNumber!=null);
     const grouped=new Map();
-    for(const row of seeded){
-      const key=`${row.eventTeamNumber}:${row.seed}`;
+    for(const row of rows){
+      const key=String(row.eventTeamNumber);
       if(!grouped.has(key))grouped.set(key,{seed:row.seed,pairNumber:row.eventTeamNumber,olympicTeam:row.olympicTeam,players:[]});
-      grouped.get(key).players.push(row);
+      const g=grouped.get(key);g.players.push(row);if(g.seed==null&&row.seed!=null)g.seed=row.seed;
     }
     const teams=[...grouped.values()].map(g=>({
-      seed:Number(g.seed),
+      seed:g.seed==null?null:Number(g.seed),
       pairNumber:Number(g.pairNumber),
       olympicTeam:g.olympicTeam||'',
       player1:g.players[0]?.name||'',
       player2:g.players[1]?.name||'',
       players:g.players.map(x=>x.name).filter(Boolean).join(' + '),
       participantIds:g.players.map(x=>x.participantId)
-    })).sort((a,b)=>a.seed-b.seed);
-    return json({ok:true,event:{id:event.notion_page_id,key:event.event_key,name:event.event},teams,count:teams.length,source:'event_participants'});
+    })).sort((a,b)=>(a.seed??999)-(b.seed??999)||a.pairNumber-b.pairNumber);
+    return json({ok:true,event:{id:event.notion_page_id,key:event.event_key,name:event.event},teams,count:teams.length,seededCount:teams.filter(t=>t.seed!=null).length,source:'event_participants'});
   }catch(e){const m=String(e?.message||e);if(m.includes('event_participants'))return json({error:'The event_participants table is not installed yet. Run the event participant SQL in Supabase.'},503);return json({error:m},502)}
 }
 
