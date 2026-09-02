@@ -8,17 +8,18 @@
   let scoreData=null;
   let detail=null;
   let openRow=null;
-  const TOURNAMENT_ASSET_VERSION='2026-09-02-slip-slide-1';
+  const TOURNAMENT_ASSET_VERSION='2026-09-02-egg-toss-1';
 
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const teamClass={'Team Red':'team-red','Team Blue':'team-blue','Team Green':'team-green','Team Gold':'team-gold'};
   const teamShort=t=>String(t||'').replace('Team ','');
-  const tournamentPath=name=>{const n=String(name||'').toLowerCase();if(n.includes('cornhole'))return'/cornhole-tournament.html';if(n.includes('adult soccer'))return'/adult-soccer-tournament.html';if(n.includes('wiffle ball'))return'/wiffle-ball-tournament.html';if(n.includes('kids slip-and-slide'))return'/kids-slip-and-slide.html';if(n.includes('adult slip-and-slide'))return'/adult-slip-and-slide.html';return''};
-  const isStandaloneTournament=name=>{const n=String(name||'').toLowerCase();return n.includes('cornhole')||n.includes('wiffle ball')||n.includes('slip-and-slide')};
+  const tournamentPath=name=>{const n=String(name||'').toLowerCase();if(n.includes('cornhole'))return'/cornhole-tournament.html';if(n.includes('adult soccer'))return'/adult-soccer-tournament.html';if(n.includes('wiffle ball'))return'/wiffle-ball-tournament.html';if(n.includes('kids slip-and-slide'))return'/kids-slip-and-slide.html';if(n.includes('adult slip-and-slide'))return'/adult-slip-and-slide.html';if(n.includes('egg toss'))return'/egg-toss.html';return''};
+  const isStandaloneTournament=name=>{const n=String(name||'').toLowerCase();return n.includes('cornhole')||n.includes('wiffle ball')||n.includes('slip-and-slide')||n.includes('egg toss')};
   const tournamentSrc=path=>`${path}?${document.body.classList.contains('control-mode')?'control=1':'view=1'}&v=${encodeURIComponent(TOURNAMENT_ASSET_VERSION)}`;
   const openStandaloneTournament=path=>{window.location.href=tournamentSrc(path)};
   const isTeamEvent=p=>!/individual/i.test(String(p?.Format||''));
-  const podium=p=>{const bits=[];const gold=Array.isArray(p['🥇 Team'])?p['🥇 Team'][0]:p['🥇 Team'];const silver=Array.isArray(p['🥈 Team'])?p['🥈 Team'][0]:p['🥈 Team'];const bronze=Array.isArray(p['🥉 Team'])?p['🥉 Team']:p['🥉 Team']?[p['🥉 Team']]:[];if(gold)bits.push(`🥇 ${esc(String(gold).replace('Team ',''))}`);if(silver)bits.push(`🥈 ${esc(String(silver).replace('Team ',''))}`);if(bronze.length)bits.push(`🥉 ${bronze.map(x=>esc(String(x).replace('Team ',''))).join(' + ')}`);return bits.join('<span>•</span>')};
+  const asTeams=v=>(Array.isArray(v)?v:v?[v]:[]).filter(Boolean);
+  const podium=p=>{const bits=[];const gold=asTeams(p['🥇 Team']),silver=asTeams(p['🥈 Team']),bronze=asTeams(p['🥉 Team']);if(gold.length)bits.push(`🥇 ${gold.map(x=>esc(String(x).replace('Team ',''))).join(' + ')}`);if(silver.length)bits.push(`🥈 ${silver.map(x=>esc(String(x).replace('Team ',''))).join(' + ')}`);if(bronze.length)bits.push(`🥉 ${bronze.map(x=>esc(String(x).replace('Team ',''))).join(' + ')}`);return bits.join('<span>•</span>')};
 
   async function getScores(force=false){
     if(scoreData&&!force)return scoreData;
