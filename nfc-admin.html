@@ -7,7 +7,7 @@
   <title>Schafer Olympics | Player Card Setup</title>
   <meta name="robots" content="noindex,nofollow"/>
   <link rel="stylesheet" href="/styles.css"/>
-  <link rel="stylesheet" href="/nfc-admin.css?v=2"/>
+  <link rel="stylesheet" href="/nfc-admin.css?v=3"/>
 </head>
 <body class="nfc-admin-body">
   <main class="nfc-admin">
@@ -16,7 +16,7 @@
         <a class="nfc-back-link" href="/gameday-hq.html">← Game Day HQ</a>
         <p class="eyebrow">🏅 Schafer Olympics 2026</p>
         <h1>Player Card Setup</h1>
-        <p class="nfc-admin__intro">Find a player, copy their link, write it to their NFC card, then open the player page to test it.</p>
+        <p class="nfc-admin__intro">Find a player and write their Game Day link to a card. Supported Android phones can write directly from this page; other devices can copy the link into an NFC app.</p>
       </header>
 
       <section class="nfc-login" aria-label="Admin access">
@@ -27,6 +27,8 @@
         <button id="load-nfc-cards" class="save-score nfc-load-button" type="button">Load Players</button>
         <span id="nfc-admin-message" class="nfc-message" aria-live="polite"></span>
       </section>
+
+      <section id="nfc-write-support" class="nfc-write-support" hidden aria-live="polite"></section>
 
       <section id="nfc-tools" class="nfc-tools" hidden>
         <div class="nfc-search-wrap">
@@ -48,9 +50,9 @@
         <summary>How to write a player card</summary>
         <div class="nfc-help__steps">
           <span><b>1</b> Find the player.</span>
-          <span><b>2</b> Tap <strong>Copy Link</strong>.</span>
-          <span><b>3</b> In your NFC writing app, create a Website/URL record and paste it.</span>
-          <span><b>4</b> Write the card, then tap <strong>Open Player Page</strong> or scan the card to test.</span>
+          <span class="nfc-help-direct"><b>2</b> On a supported Android phone, tap <strong>Write Card</strong> and then touch the NFC tag to the phone.</span>
+          <span class="nfc-help-fallback"><b>2</b> Otherwise tap <strong>Copy Link</strong>, paste it into your NFC writing app as a Website/URL record, and write the card there.</span>
+          <span><b>3</b> Tap <strong>Open Player Page</strong> or scan the card to confirm it opens the correct player.</span>
         </div>
       </details>
 
@@ -64,6 +66,6 @@
     </div>
   </main>
   <script src="/no-zoom.js" defer></script>
-  <script src="/nfc-admin.js?v=2" defer></script>
+  <script src="/nfc-admin.js?v=3" defer></script>
 </body>
 </html>
