@@ -86,37 +86,30 @@ function renderLeaderboard(){
   else if(gf1?.Status==='Complete'&&gf1.Winner&&w7?.Winner&&gf1.Winner===w7.Winner){champion=gf1.Winner;runnerUp=gf1.Loser}
   if(!champion){leaderboardStatus.textContent='Waiting for finish';leaderboard.innerHTML='<div class="loading">Final standings will appear when the tournament is complete.</div>';return}
 
-  const rows=[
-    ['🥇 1st',champion],
-    ['🥈 2nd',runnerUp],
-    ['🥉 3rd',matchByCode('L8')?.Loser],
-    ['4th',matchByCode('L7')?.Loser],
-    ['T-5th',matchByCode('L5')?.Loser],
-    ['T-5th',matchByCode('L6')?.Loser],
-    ['T-7th',matchByCode('L3')?.Loser],
-    ['T-7th',matchByCode('L4')?.Loser],
-    ['T-9th',matchByCode('L1')?.Loser],
-    ['T-9th',matchByCode('L2')?.Loser]
-  ].filter(x=>x[1]);
-  const orderValue=x=>{const n=Number(String(x[0]).match(/\d+/)?.[0]||99);return n};
+  const twelve=teams.length===12;
+  const rows=(twelve?[
+    ['🥇 1st',champion],['🥈 2nd',runnerUp],['🥉 3rd',matchByCode('L10')?.Loser],['4th',matchByCode('L9')?.Loser],
+    ['T-5th',matchByCode('L7')?.Loser],['T-5th',matchByCode('L8')?.Loser],
+    ['T-7th',matchByCode('L5')?.Loser],['T-7th',matchByCode('L6')?.Loser],
+    ['T-9th',matchByCode('L1')?.Loser],['T-9th',matchByCode('L2')?.Loser],['T-9th',matchByCode('L3')?.Loser],['T-9th',matchByCode('L4')?.Loser]
+  ]:[
+    ['🥇 1st',champion],['🥈 2nd',runnerUp],['🥉 3rd',matchByCode('L8')?.Loser],['4th',matchByCode('L7')?.Loser],
+    ['T-5th',matchByCode('L5')?.Loser],['T-5th',matchByCode('L6')?.Loser],
+    ['T-7th',matchByCode('L3')?.Loser],['T-7th',matchByCode('L4')?.Loser],
+    ['T-9th',matchByCode('L1')?.Loser],['T-9th',matchByCode('L2')?.Loser]
+  ]).filter(x=>x[1]);
+  const orderValue=x=>Number(String(x[0]).match(/\d+/)?.[0]||99);
   rows.sort((a,b)=>orderValue(a)-orderValue(b)||(seedNumber(a[1])??99)-(seedNumber(b[1])??99));
   leaderboardStatus.textContent='Final';
   leaderboard.innerHTML='<div class="leaderboard-row is-header"><span>Finish</span><span>Pair</span><span>Olympic Team</span><span>Record</span><span>Seed</span></div>'+rows.map(([finish,label])=>finishRow(finish,label)).join('');
 }
 function render(){
   renderSeeds();renderStatus();
-  if(!teams.length){
-    wb.innerHTML='<div class="loading">0</div>';
-    lb.innerHTML='<div class="loading">0</div>';
-    finals.innerHTML='<div class="loading">0</div>';
-    renderLeaderboard();
-    return;
-  }
+  if(!teams.length){wb.innerHTML='<div class="loading">0</div>';lb.innerHTML='<div class="loading">0</div>';finals.innerHTML='<div class="loading">0</div>';renderLeaderboard();return}
   renderRounds(wb,'Winners');renderRounds(lb,'Losers');
   const fs=matches.filter(m=>m.properties?.Bracket==='Finals').sort((a,b)=>Number(a.properties?.Round)-Number(b.properties?.Round));
   finals.innerHTML=fs.map(m=>`<section class="final-card"><h4>${esc(roundNames.Finals[m.properties?.Round]||m.properties?.Match)}</h4>${card(m)}</section>`).join('')||'<div class="loading">No championship matches found.</div>';
-  renderLeaderboard();
-  bindScoring();
+  renderLeaderboard();bindScoring();
 }
 function openScore(id){
   if(!control)return;
@@ -124,8 +117,7 @@ function openScore(id){
   const p=m.properties,done=p.Status==='Complete';
   if(!(p.Status==='Ready'||done)||!p['Team A']||!p['Team B'])return;
   const a=canonical(p['Team A'],p['Team A Players']),b=canonical(p['Team B'],p['Team B Players']),sheet=$('#score-sheet');
-  sheet.dataset.matchId=id;
-  sheet.dataset.wasComplete=done?'1':'0';
+  sheet.dataset.matchId=id;sheet.dataset.wasComplete=done?'1':'0';
   $('#score-sheet-title').textContent=`${p.Match} · ${done?'Edit Score':'Enter Score'}`;
   $('#score-sheet-teams').innerHTML=`<div><strong>${esc(a.players||a.label)}</strong><small>${esc([a.label,a.olympicTeam].filter(Boolean).join(' · '))}</small></div><span>vs</span><div><strong>${esc(b.players||b.label)}</strong><small>${esc([b.label,b.olympicTeam].filter(Boolean).join(' · '))}</small></div>`;
   $('#score-sheet-fields').innerHTML=`<label><span>${esc(a.players||a.label)}</span><input name="a" type="number" min="0" value="${p['Score A']??''}" required></label><label><span>${esc(b.players||b.label)}</span><input name="b" type="number" min="0" value="${p['Score B']??''}" required></label>`;
@@ -136,9 +128,7 @@ function closeScore(){const s=$('#score-sheet');s.hidden=true;s.dataset.matchId=
 function bindScoring(){document.querySelectorAll('.match.clickable').forEach(el=>{el.onclick=()=>openScore(el.dataset.id);el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openScore(el.dataset.id)}}})}
 async function postScore(m,a,b,code,allowWinnerChange){
   const r=await fetch('/api/cornhole',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matchId:m.id,scoreA:a,scoreB:b,code,allowWinnerChange})});
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok){const err=new Error(d.error||'Could not save result.');err.data=d;throw err}
-  return d;
+  const d=await r.json().catch(()=>({}));if(!r.ok){const err=new Error(d.error||'Could not save result.');err.data=d;throw err}return d;
 }
 async function saveScore(e){
   e.preventDefault();if(!control)return;
@@ -147,21 +137,11 @@ async function saveScore(e){
   const code=sessionStorage.getItem('schaferOlympicsControlCode')||'';if(!code){msg.textContent='Control View is locked. Re-enter Control View.';return}
   const p=m.properties||{},newWinner=a>b?p['Team A']:p['Team B'],winnerChanges=p.Status==='Complete'&&p.Winner&&p.Winner!==newWinner;
   let allowWinnerChange=false;
-  if(winnerChanges){
-    allowWinnerChange=confirm(`This changes the winner from ${p.Winner} to ${newWinner}. All affected downstream Cornhole matches and scores will be reset so the bracket stays valid. Continue?`);
-    if(!allowWinnerChange)return;
-  }
+  if(winnerChanges){allowWinnerChange=confirm(`This changes the winner from ${p.Winner} to ${newWinner}. All affected downstream Cornhole matches and scores will be reset so the bracket stays valid. Continue?`);if(!allowWinnerChange)return}
   btn.disabled=true;msg.textContent='Saving…';
   try{
-    let d;
-    try{d=await postScore(m,a,b,code,allowWinnerChange)}catch(err){
-      if(err.data?.needsWinnerChangeConfirmation&&!allowWinnerChange){
-        if(!confirm('This correction changes the winner and will reset affected downstream Cornhole matches. Continue?'))throw err;
-        d=await postScore(m,a,b,code,true);
-      }else throw err;
-    }
-    if(Array.isArray(d.matches)){matches=d.matches;render()}
-    closeScore();
+    let d;try{d=await postScore(m,a,b,code,allowWinnerChange)}catch(err){if(err.data?.needsWinnerChangeConfirmation&&!allowWinnerChange){if(!confirm('This correction changes the winner and will reset affected downstream Cornhole matches. Continue?'))throw err;d=await postScore(m,a,b,code,true)}else throw err}
+    if(Array.isArray(d.matches)){matches=d.matches;render()}closeScore();
   }catch(err){msg.textContent=err.message||'Could not save result.'}finally{btn.disabled=false}
 }
 async function load(){
