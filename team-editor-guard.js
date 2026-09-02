@@ -13,4 +13,11 @@
       }
     }
   },true);
+  if(!document.querySelector('script[data-slip-slide-team-setup]')){
+    const s=document.createElement('script');
+    s.src='/slip-slide-team-setup.js?v=1';
+    s.defer=true;
+    s.dataset.slipSlideTeamSetup='1';
+    document.head.appendChild(s);
+  }
 })();
