@@ -6,6 +6,9 @@
   <meta name="color-scheme" content="light">
   <title>Schafer Olympics — Cornhole Tournament</title>
   <link rel="stylesheet" href="/cornhole-tournament.css?v=20260901-rebuild1">
+  <style>
+    .final-leaderboard{display:grid;gap:8px}.leaderboard-row{display:grid;grid-template-columns:76px minmax(190px,1.5fr) minmax(120px,1fr) 76px 76px;gap:10px;align-items:center;padding:12px 14px;border:1px solid #dbe4ee;border-radius:14px;background:#fff}.leaderboard-row.is-header{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;background:#f5f8fb;color:#687286}.leaderboard-row.is-medal{border-width:2px}.leaderboard-finish{font-weight:900;font-size:18px}.leaderboard-pair strong{display:block}.leaderboard-pair small{display:block;color:#687286;margin-top:2px}.leaderboard-team{font-weight:700}.leaderboard-record,.leaderboard-seed{text-align:center;font-weight:800}.leaderboard-note{color:#687286;margin:0 0 14px}@media(max-width:700px){.leaderboard-row{grid-template-columns:60px minmax(0,1fr) 64px}.leaderboard-row.is-header span:nth-child(3),.leaderboard-row.is-header span:nth-child(5),.leaderboard-team,.leaderboard-seed{display:none}.leaderboard-record{text-align:right}.leaderboard-finish{font-size:16px}}
+  </style>
 </head>
 <body>
   <main class="page-shell">
@@ -54,6 +57,18 @@
         <div id="finals-grid" class="finals-grid"></div>
       </div>
     </section>
+
+    <section class="section" id="final-leaderboard-section">
+      <div class="section-title-row">
+        <div>
+          <p class="eyebrow">Final results</p>
+          <h2>Cornhole Final Leaderboard</h2>
+        </div>
+        <div id="leaderboard-status" class="bracket-status">Waiting for finish</div>
+      </div>
+      <p class="leaderboard-note">Final double-elimination placement. Teams eliminated in the same round share a tied finish.</p>
+      <div id="final-leaderboard" class="final-leaderboard"><div class="loading">Final standings will appear when the tournament is complete.</div></div>
+    </section>
   </main>
 
   <div id="score-sheet" class="score-sheet" hidden>
@@ -71,7 +86,7 @@
     </section>
   </div>
 
-  <script src="/cornhole-tournament.js?v=20260901-edit-score2" defer></script>
+  <script src="/cornhole-tournament.js?v=20260902-final-leaderboard1" defer></script>
   <script src="/tournament-clear-ui.js?v=20260901-clear1" defer></script>
 </body>
 </html>
