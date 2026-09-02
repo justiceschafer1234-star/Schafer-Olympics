@@ -8,6 +8,14 @@ async function sb(env,path,init={}){
   if(!r.ok)throw new Error(typeof d==='string'?d:(d?.message||`Supabase ${r.status}`));
   return d;
 }
+async function bulkUpsert(env,table,rows,onConflict='id'){
+  if(!rows.length)return;
+  await sb(env,`${table}?on_conflict=${encodeURIComponent(onConflict)}`,{
+    method:'POST',
+    headers:{Prefer:'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify(rows)
+  });
+}
 async function resolveCornhole(env){
   const rows=await sb(env,'olympic_events?select=id,event,event_key&event_key=eq.cornhole-tournament&limit=1');
   if(!rows[0])throw new Error('Cornhole event not found.');
@@ -41,10 +49,11 @@ async function setRoutes(env,matches,count){
 async function seedCornhole(body,env){
   if(!env.ADMIN_SCORE_CODE||String(body.code||'')!==String(env.ADMIN_SCORE_CODE))return json({error:'Incorrect control code.'},401);
   const event=await resolveCornhole(env);
-  const [pairs,people,matches]=await Promise.all([
-    sb(env,`event_pairs?select=id,pair_number,participant_1_id,participant_2_id&event_id=eq.${event.id}&order=pair_number.asc`),
+  const [pairs,people,matches,eventParticipants]=await Promise.all([
+    sb(env,`event_pairs?select=id,event_id,pair_number,olympic_team,participant_1_id,participant_2_id&event_id=eq.${event.id}&order=pair_number.asc`),
     sb(env,'participants?select=id,participant'),
-    sb(env,'cornhole_matches?select=id,match_code,status,score_a,score_b&order=sort_order.asc')
+    sb(env,'cornhole_matches?select=id,match_code,status,score_a,score_b&order=sort_order.asc'),
+    sb(env,`event_participants?select=id,event_id,participant_id,olympic_team,registered,event_team_number,seed,role,notes&event_id=eq.${event.id}`)
   ]);
   if(!pairs.length)return json({error:'Create and save Cornhole pairs first.'},400);
   if(pairs.length>12)return json({error:'Cornhole supports a maximum of 12 pairs.'},400);
@@ -66,13 +75,38 @@ async function seedCornhole(body,env){
   await sb(env,`event_pairs?event_id=eq.${event.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({seed:null})});
   await sb(env,`event_participants?event_id=eq.${event.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({seed:null})});
 
-  const byPerson=new Map(people.map(p=>[p.id,p.participant||''])),seeded=new Map();
+  const byPerson=new Map(people.map(p=>[p.id,p.participant||''])),seeded=new Map(),seedByPairNumber=new Map();
+  const pairSeedRows=[];
   for(const x of seeds){
     const p=pairById.get(String(x.pairId)),n=Number(x.seed),players=`${byPerson.get(p.participant_1_id)||''} + ${byPerson.get(p.participant_2_id)||''}`;
     seeded.set(n,{label:`Seed ${n}`,players});
-    await sb(env,`event_pairs?id=eq.${p.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({seed:n})});
-    await sb(env,`event_participants?event_id=eq.${event.id}&event_team_number=eq.${p.pair_number}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({seed:n})});
+    seedByPairNumber.set(Number(p.pair_number),n);
+    pairSeedRows.push({
+      id:p.id,
+      event_id:p.event_id,
+      pair_number:p.pair_number,
+      olympic_team:p.olympic_team,
+      participant_1_id:p.participant_1_id,
+      participant_2_id:p.participant_2_id,
+      seed:n
+    });
   }
+  await bulkUpsert(env,'event_pairs',pairSeedRows,'id');
+
+  const participantSeedRows=eventParticipants
+    .filter(ep=>seedByPairNumber.has(Number(ep.event_team_number)))
+    .map(ep=>({
+      id:ep.id,
+      event_id:ep.event_id,
+      participant_id:ep.participant_id,
+      olympic_team:ep.olympic_team,
+      registered:ep.registered,
+      event_team_number:ep.event_team_number,
+      seed:seedByPairNumber.get(Number(ep.event_team_number)),
+      role:ep.role,
+      notes:ep.notes
+    }));
+  await bulkUpsert(env,'event_participants',participantSeedRows,'id');
 
   const openings=pairs.length===12
     ? [['P1',5,12],['P2',6,11],['P3',7,10],['P4',8,9],['W1',1,null],['W2',4,null],['W3',2,null],['W4',3,null]]
