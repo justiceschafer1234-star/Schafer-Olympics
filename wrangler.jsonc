@@ -7,7 +7,6 @@
     "required": [
       "SUPABASE_URL",
       "SUPABASE_SECRET_KEY",
-      "NOTION_API_TOKEN",
       "ADMIN_SCORE_CODE",
       "DISCORD_WEBHOOK_URL"
     ]
