@@ -141,11 +141,11 @@ function renderMedals(rows, standings) {
 }
 
 function renderProgress(rows, standings, race) {
-  const total = Number(race?.totalEvents ?? rows.length);
-  const complete = Number(race?.completedEvents ?? rows.filter(resultRecorded).length);
+  const total = rows.length || Number(race?.totalEvents || 0);
+  const complete = rows.filter(resultRecorded).length;
   const pct = total ? Math.round((complete / total) * 100) : 0;
   const statusCounts = {
-    Complete: rows.filter(resultRecorded).length,
+    Complete: complete,
     'In Progress': rows.filter((r) => !resultRecorded(r) && r.properties?.Status === 'In Progress').length,
     Delayed: rows.filter((r) => !resultRecorded(r) && r.properties?.Status === 'Delayed').length,
     'Not Started': rows.filter((r) => !resultRecorded(r) && !['In Progress', 'Delayed'].includes(r.properties?.Status)).length,
