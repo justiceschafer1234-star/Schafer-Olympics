@@ -8,11 +8,11 @@ const RULES={
   'women-s-three-point-contest':{mode:'two-stage',title:'Women’s Three-Point Contest',finalists:4,places:3},
   'men-s-three-point-contest':{mode:'two-stage',title:'Men’s Three-Point Contest',finalists:6,places:3},
   'speed-grab':{mode:'bracket',title:'Speed Grab',places:3},
-  'nuke-em':{mode:'game',title:'Nuke ’Em',combined:true,places:2},
+  'nuke-em':{mode:'game',title:'Nuke ’Em',combined:false,places:2},
   'speed-volleyball-volleyball':{mode:'round-total',title:'Speed Volleyball',minRounds:2,maxRounds:4,places:4},
   'water-tasting':{mode:'individual',title:'Water Tasting',places:3},
-  'fill-the-water-bottle':{mode:'game',title:'Fill the Water Bottle',combined:true,places:2},
-  'protect-the-balloon-baby':{mode:'game',title:'Protect the Balloon Baby',combined:true,places:2,noPoints:true},
+  'fill-the-water-bottle':{mode:'game',title:'Fill the Water Bottle',combined:false,places:2},
+  'protect-the-balloon-baby':{mode:'game',title:'Protect the Balloon Baby',combined:false,places:2,noPoints:true},
   'kids-dodgeball':{mode:'series',title:'Kids Dodgeball',combined:true,bestOf:3,places:2},
   'women-s-dodgeball':{mode:'series',title:'Women’s Dodgeball',combined:true,bestOf:3,places:2},
   'men-s-dodgeball':{mode:'series',title:'Men’s Dodgeball',combined:true,bestOf:3,places:2}
@@ -30,7 +30,7 @@ function outcome(rule,state){let p={gold:[],silver:[],bronze1:[],bronze2:[]},com
   else if(rule.mode==='round-total'){const entries=(state.entries||[]).map(e=>({...e,total:(e.scores||[]).reduce((a,x)=>a+(Number(x)||0),0)}));p=podiumFromEntries(entries,e=>e.total,rule.places);complete=Boolean(state.complete)&&entries.length===4}
   else if(rule.mode==='pairs'||rule.mode==='individual'){const entries=state.entries||[];p=podiumFromEntries(entries,e=>e.score,rule.places);complete=Boolean(state.complete)&&entries.length>0}
   else if(rule.mode==='two-stage'){const entries=(state.entries||[]).filter(e=>e.advanced);p=podiumFromEntries(entries,e=>e.finalScore,rule.places);complete=Boolean(state.complete)&&entries.length===rule.finalists}
-  else if(rule.mode==='bracket'){const byId=new Map((state.entries||[]).map(e=>[e.id,e])),ids=state.placements||[];if(ids[0]&&ids[1]){p.gold=uniq(byId.get(ids[0])?.teams);p.silver=uniq(byId.get(ids[1])?.teams);p.bronze1=uniq(byId.get(ids[2])?.teams);complete=Boolean(state.complete)}}
+  else if(rule.mode==='bracket'){const byId=new Map((state.entries||[]).map(e=>[e.id,e])),ids=state.placements||[];if(ids[0]&&ids[1]){p.gold=uniq(byId.get(ids[0])?.teams);p.silver=uniq(byId.get(ids[1])?.teams);p.bronze1=uniq(ids.slice(2).flatMap(id=>byId.get(id)?.teams||[]));complete=Boolean(state.complete)}}
   return{podium:p,complete};
 }
 async function load(env,key){const rule=RULES[key];if(!rule)throw new Error('This event does not have a scorecard yet.');const es=await sb(env,`olympic_events?select=*&event_key=eq.${enc(key)}&limit=1`),event=es[0];if(!event)throw new Error('Event not found.');const [card,people,regs,pairs]=await Promise.all([
@@ -41,7 +41,6 @@ async function load(env,key){const rule=RULES[key];if(!rule)throw new Error('Thi
   ]),registered=new Set(regs.map(x=>x.participant_id)),byId=new Map(people.map(x=>[x.id,x]));
   return{ok:true,rule,event:{id:event.id,key:event.event_key,name:event.event,number:event.event_number,status:event.status,goldPoints:Number(event.gold_points),silverPoints:Number(event.silver_points),bronze1Points:Number(event.bronze_1_points),bronze2Points:Number(event.bronze_2_points)},participants:people.filter(x=>registered.has(x.id)).map(x=>({id:x.id,key:x.participant_key,name:x.participant,team:x.team||''})),pairs:pairs.map(x=>({id:x.id,pairNumber:x.pair_number,teams:[x.olympic_team],team:x.olympic_team,player1:byId.get(x.participant_1_id)?.participant||'',player2:byId.get(x.participant_2_id)?.participant||''})),state:card[0]?.state||{},updatedAt:card[0]?.updated_at||null};
 }
-async function save(env,key,state){const d=await load(env,key),{podium,complete}=outcome(d.rule,state),status=complete?'Complete':Object.keys(state||{}).length?'In Progress':'Not Started';await sb(env,'event_scorecards?on_conflict=event_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({event_id:d.event.id,format_key:d.rule.mode,state})});await sb(env,`olympic_events?id=eq.${d.event.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({gold_teams:podium.gold,silver_teams:podium.silver,bronze_1_teams:podium.bronze1,bronze_2_teams:podium.bronze2,legacy_bronze_teams:[],status})});return load(env,key)}
+async function save(env,key,state){const d=await load(env,key);if(['game','series'].includes(d.rule.mode)){const sides=state.sides||[],size=d.rule.combined?2:1,all=sides.flat();if(sides.length!==2||sides.some(x=>!Array.isArray(x)||x.length!==size)||all.some(x=>!TEAMS.includes(x))||new Set(all).size!==all.length)return Promise.reject(new Error(`Choose exactly ${size} different Olympic team${size===1?'':'s'} for each side.`))}const {podium,complete}=outcome(d.rule,state),status=complete?'Complete':Object.keys(state||{}).length?'In Progress':'Not Started';await sb(env,'event_scorecards?on_conflict=event_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({event_id:d.event.id,format_key:d.rule.mode,state})});await sb(env,`olympic_events?id=eq.${d.event.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({gold_teams:podium.gold,silver_teams:podium.silver,bronze_1_teams:podium.bronze1,bronze_2_teams:podium.bronze2,legacy_bronze_teams:[],status})});return load(env,key)}
 export default{async fetch(request,env,ctx){const u=new URL(request.url);if(u.pathname!=='/api/event-scorecard')return app.fetch(request,env,ctx);const key=String(u.searchParams.get('eventKey')||'');try{if(request.method==='GET')return json(await load(env,key));if(request.method!=='POST')return json({error:'Method not allowed'},405);let b={};try{b=await request.json()}catch{return json({error:'Invalid request.'},400)}if(!env.ADMIN_SCORE_CODE||String(b.code||'')!==String(env.ADMIN_SCORE_CODE))return json({error:'Incorrect control code.'},401);if(b.action==='reset')return json(await save(env,key,{}));if(b.action!=='save'||!b.state||typeof b.state!=='object'||Array.isArray(b.state))return json({error:'Invalid scorecard state.'},400);return json(await save(env,key,b.state))}catch(e){return json({error:String(e?.message||e)},502)}}};
-
 
