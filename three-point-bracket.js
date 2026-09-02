@@ -6,15 +6,13 @@ if(!scorecard)return;
 const FINALISTS=4;
 let working=false,advanceTimer=null,saveTimer=null,autoAdvancing=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
-function scheduleSave(delay=700){
+function saveNow(){
   clearTimeout(saveTimer);
+  if(autoAdvancing){saveTimer=setTimeout(saveNow,100);return}
   const state=document.querySelector('#save-state');
   if(state)state.textContent='Autosaving…';
-  saveTimer=setTimeout(()=>{
-    if(autoAdvancing){scheduleSave(250);return}
-    const save=document.querySelector('#save');
-    if(save&&!save.disabled)save.click();
-  },delay);
+  const save=document.querySelector('#save');
+  if(save&&!save.disabled)save.click();
 }
 function roundOneCards(){return [...scorecard.querySelectorAll('.shootout-round:first-child .shootout-card:not(.is-placeholder)')]}
 function chooseFinalists(ranked){
@@ -42,7 +40,6 @@ function automaticAdvance(){
     autoAdvancing=false;
     const note=scorecard.querySelector('.shootout-limit');
     if(note)note.textContent='Enter every Round 1 score. The top 4 advance automatically.';
-    scheduleSave();
     return;
   }
   const ranked=[...scored].sort((a,b)=>b.score-a.score||a.index-b.index);
@@ -63,7 +60,7 @@ function automaticAdvance(){
       ?'Top scorer plus all 3 shooters tied for second advanced automatically to Round 2.'
       :'Top 4 advanced automatically to Round 2.';
   }
-  scheduleSave(300);
+  saveNow();
 }
 function queueAdvance(delay=250){clearTimeout(advanceTimer);advanceTimer=setTimeout(automaticAdvance,delay)}
 function build(){
@@ -113,7 +110,11 @@ function build(){
 scorecard.addEventListener('input',e=>{
   if(!e.target.matches('input[type="number"]'))return;
   if(e.target.placeholder==='Round 1')queueAdvance();
-  scheduleSave();
+},true);
+scorecard.addEventListener('change',e=>{
+  if(!e.target.matches('input[type="number"]'))return;
+  if(e.target.placeholder==='Round 1')queueAdvance(0);
+  setTimeout(saveNow,0);
 },true);
 new MutationObserver(()=>queueMicrotask(build)).observe(scorecard,{childList:true,subtree:true});
 build();
