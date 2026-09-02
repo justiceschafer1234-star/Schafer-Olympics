@@ -7,7 +7,12 @@
   <title>Schafer Olympics — Wiffle Ball</title>
   <link rel="stylesheet" href="/cornhole-tournament.css?v=20260901-wiffle1">
   <style>
-    .bracket.wiffle{grid-template-columns:minmax(250px,520px);min-width:0}.bracket.wiffle .round{min-width:0}.seed-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}.seed-actions .score-sheet__save{width:auto;min-width:160px;margin-top:0}.seed-actions .score-sheet__status{margin-top:0;min-height:0;color:#687286}@media(max-width:700px){.bracket.wiffle{grid-template-columns:minmax(215px,1fr)}.seed-actions .score-sheet__save{width:100%}}
+    .bracket.wiffle{grid-template-columns:minmax(250px,520px);min-width:0}.bracket.wiffle .round{min-width:0}.seed-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}.seed-actions .score-sheet__save{width:auto;min-width:160px;margin-top:0}.seed-actions .score-sheet__status{margin-top:0;min-height:0;color:#687286}
+    .seed-row,.slot,.score-sheet__teams .team-block{position:relative;overflow:hidden}.seed-row::before,.slot::before,.score-sheet__teams .team-block::before{content:"";position:absolute;inset:0 auto 0 0;width:7px;background:var(--team-color,#c7d2df)}
+    .team-red{--team-color:#d83b3b;--team-soft:#fff0f0}.team-blue{--team-color:#3478d4;--team-soft:#eef5ff}.team-green{--team-color:#2f9b58;--team-soft:#effaf3}.team-gold{--team-color:#d4a72c;--team-soft:#fff9e7}
+    .seed-row.team-red,.seed-row.team-blue,.seed-row.team-green,.seed-row.team-gold,.slot.team-red,.slot.team-blue,.slot.team-green,.slot.team-gold{background:linear-gradient(90deg,var(--team-soft),#fff 58%)}
+    .team-block{min-width:0;padding-left:4px}.team-name-row{display:flex;align-items:center;gap:8px}.team-dot{width:11px;height:11px;border-radius:50%;background:var(--team-color,#c7d2df);box-shadow:0 0 0 3px #fff;flex:0 0 auto}.team-members{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}.team-members span{font-size:.76rem;line-height:1.2;padding:3px 7px;border-radius:999px;background:#fff;border:1px solid color-mix(in srgb,var(--team-color,#c7d2df) 32%,#dce3ea);color:#4c5668}.team-members.empty{font-size:.74rem;color:#8a94a5}.slot{align-items:flex-start}.slot .score{align-self:center}.seed-row .team-block{flex:1}.score-sheet__teams{align-items:stretch}.score-sheet__teams .team-block{flex:1;padding:12px 12px 12px 18px;border-radius:12px;background:linear-gradient(135deg,var(--team-soft,#f7f9fc),#fff);border:1px solid #e3e8ef}.score-sheet__form label.team-red,.score-sheet__form label.team-blue,.score-sheet__form label.team-green,.score-sheet__form label.team-gold{border-left:5px solid var(--team-color);padding-left:10px}
+    @media(max-width:700px){.bracket.wiffle{grid-template-columns:minmax(215px,1fr)}.seed-actions .score-sheet__save{width:100%}.team-members span{font-size:.72rem}.score-sheet__teams{display:grid;grid-template-columns:1fr}.score-sheet__teams>span{text-align:center}}
   </style>
 </head>
 <body>
@@ -78,7 +83,7 @@
     </section>
   </div>
 
-  <script src="/wiffle-ball-standalone.js?v=20260901-finish2" defer></script>
+  <script src="/wiffle-ball-standalone.js?v=20260902-team-rosters1" defer></script>
   <script src="/tournament-clear-ui.js?v=20260901-clear1" defer></script>
 </body>
 </html>
