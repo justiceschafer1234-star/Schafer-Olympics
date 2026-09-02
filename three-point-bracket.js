@@ -4,8 +4,21 @@ if(!['women-s-three-point-contest','men-s-three-point-contest'].includes(key))re
 const scorecard=document.querySelector('#scorecard');
 if(!scorecard)return;
 const FINALISTS=4;
-let working=false,advanceTimer=null,saveTimer=null,autoAdvancing=false;
+let working=false,advanceTimer=null,saveTimer=null,autoAdvancing=false,restoreFocus=null;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+function rememberFocus(input){
+  if(!input?.matches?.('input[type="number"]')){restoreFocus=null;return}
+  restoreFocus={i:input.dataset.i||'',field:input.dataset.field||''};
+}
+function restoreScoreFocus(){
+  if(!restoreFocus)return;
+  const {i,field}=restoreFocus;
+  const input=scorecard.querySelector(`input[type="number"][data-i="${CSS.escape(i)}"][data-field="${CSS.escape(field)}"]`);
+  if(input&&!input.disabled&&document.activeElement!==input){
+    input.focus({preventScroll:true});
+    try{input.select()}catch{}
+  }
+}
 function saveNow(){
   clearTimeout(saveTimer);
   if(autoAdvancing){saveTimer=setTimeout(saveNow,100);return}
@@ -106,10 +119,19 @@ function build(){
   entries.replaceWith(bracket);bracket.append(round1,arrow,round2);
   working=false;
   queueAdvance(80);
+  queueMicrotask(restoreScoreFocus);
 }
 scorecard.addEventListener('input',e=>{
   if(!e.target.matches('input[type="number"]'))return;
+  rememberFocus(e.target);
   if(e.target.placeholder==='Round 1')queueAdvance();
+},true);
+scorecard.addEventListener('focusin',e=>{
+  if(e.target.matches('input[type="number"]'))rememberFocus(e.target);
+},true);
+document.addEventListener('pointerdown',e=>{
+  if(e.target.matches?.('input[type="number"]')&&scorecard.contains(e.target))rememberFocus(e.target);
+  else restoreFocus=null;
 },true);
 scorecard.addEventListener('change',e=>{
   if(!e.target.matches('input[type="number"]'))return;
