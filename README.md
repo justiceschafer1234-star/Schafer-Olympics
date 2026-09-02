@@ -1,72 +1,81 @@
-# Schafer Olympics Scoreboard
+# Schafer Olympics
 
-A Cloudflare Pages scoreboard that reads live results from a Notion data source without exposing the Notion API token to the browser.
+Schafer Olympics is a Cloudflare Worker + static-assets application with **Supabase as the production source of truth** for events, participants, registrations, scorecards, tournament state, and Olympic standings.
 
-## Architecture
+## Production architecture
 
-- `index.html` — scoreboard page
-- `styles.css` — responsive scoreboard styling
-- `app.js` — loads and ranks team scores
-- `functions/api/scores.js` — server-side Cloudflare Pages Function that securely queries Notion
+```text
+Browser / scoring device
+        |
+        v
+Cloudflare Worker
+        |
+        v
+Supabase PostgreSQL / REST API
+        |
+        +---- optional background backup ----> Notion
+```
 
-## 1. Rotate the Notion token
+The browser never receives the Supabase secret key or the Notion API token. Server-side API routes run through the Worker and use Cloudflare secrets.
 
-If a Notion token has ever been pasted into chat, source code, an issue, or another non-secret location, revoke it and create a replacement before deployment.
+## Public scoreboard
 
-Never add the token to this repository.
+`GET /api/scores` reads `olympic_events` from Supabase and calculates standings from the stored placement arrays and event point values.
 
-## 2. Get the Notion data source ID
+The outer Worker applies a short Cloudflare edge cache to public score reads so many spectators refreshing at once do not generate the same database request repeatedly.
 
-Open the table in Notion, open its data source settings/menu, and copy the data source ID. Current Notion API versions query a data source rather than the legacy database-query endpoint.
+Supabase remains the source of truth. The scoreboard does not require Notion to be available.
 
-## 3. Create the Cloudflare Pages project
+## Score entry
 
-In Cloudflare:
+Event-specific scorecards and tournament controllers save their operational state to Supabase. Server-side Worker code validates and derives event placements/status before updating the event results used by the public standings.
 
-1. Go to **Workers & Pages**.
-2. Create a Pages project by importing the GitHub repository `justiceschafer1234-star/Schafer-Olympics`.
-3. Select the `main` branch.
-4. This is a plain HTML project, so no framework build is required. Use the repository root as the static site output.
-5. Deploy the project.
+Existing score-entry autosave behavior is intentionally preserved.
 
-The `/functions` directory is automatically used by Cloudflare Pages Functions and creates the `/api/scores` route.
+## Required Cloudflare secrets
 
-## 4. Add Cloudflare variables and secrets
+- `SUPABASE_URL`
+- `SUPABASE_SECRET_KEY`
+- `ADMIN_SCORE_CODE`
+- `DISCORD_WEBHOOK_URL`
 
-In the Pages project, open **Settings → Variables and Secrets**.
+`SUPABASE_SECRET_KEY` must remain server-side only and must never be added to browser JavaScript or committed to this repository.
 
-Add:
+## Optional Notion backup
 
-- `NOTION_API_TOKEN` — paste the newly generated Notion token and mark/encrypt it as a **Secret**.
-- `NOTION_DATA_SOURCE_ID` — paste the data source ID. This can be a regular environment variable.
+`NOTION_API_TOKEN` is optional. When configured, supported write paths can send backup updates to Notion using `ctx.waitUntil(...)`. Backup failures are caught and logged and do not determine whether the primary Supabase operation succeeds.
 
-Redeploy after adding them if Cloudflare requests it.
+If Notion backup is not wanted, the Worker can operate without `NOTION_API_TOKEN`.
 
-## 5. Expected Notion columns
+## Data model
 
-The front end automatically looks for common names.
+Primary Supabase tables include:
 
-For the team name, it prefers:
+- `olympic_events`
+- `participants`
+- `registrations`
+- `event_participants`
+- `event_pairs`
+- `event_scorecards`
+- `cornhole_matches`
+- `adult_soccer_matches`
+- `wiffle_ball_matches`
+- `kids_soccer_sides`
+- `slip_slide_entries`
+- `egg_toss_results`
 
-- `Team`
-- `Team Name`
-- `Name`
-
-For the score, it prefers:
-
-- `Points`
-- `Total Points`
-- `Score`
-- `Total`
-
-If your Notion table uses different column names, edit `app.js` or update the table property names.
-
-## Security
-
-The browser calls `/api/scores`. Only the Cloudflare Function talks to Notion. The Notion API token is read from `context.env.NOTION_API_TOKEN`, so it never needs to appear in HTML or browser JavaScript.
-
-Local secret files such as `.dev.vars` and `.env` are intentionally ignored by Git.
+SQL/schema and migration utilities are kept under `supabase/`.
 
 ## Deployment
 
-Cloudflare deployment trigger updated on August 29, 2026.
+Cloudflare Worker configuration is in `wrangler.jsonc`. Static assets are served from the repository root and `/api/*` requests run through the Worker first.
+
+The configured Worker entry point is `worker-kids-soccer.js`, which delegates through the composed Worker modules for the remaining API routes.
+
+## Reliability notes
+
+- Public score reads are cached briefly at the Cloudflare edge.
+- Production reads/writes use Supabase rather than Notion.
+- Notion backup is optional and asynchronous.
+- Row-level security is enabled on the Supabase public tables; server-side Worker access uses the secret Supabase credential.
+- Operational datasets are small and indexed for the current event workload.
