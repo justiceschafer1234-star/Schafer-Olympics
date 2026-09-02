@@ -13,7 +13,14 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const teamClass={'Team Red':'team-red','Team Blue':'team-blue','Team Green':'team-green','Team Gold':'team-gold'};
   const teamShort=t=>String(t||'').replace('Team ','');
-  const SCORECARD_EVENTS={\n    'kahoot':'kahoot','kids soccer':'kids-soccer','junior basketball':'junior-basketball',\n    'women’s three-point contest':'women-s-three-point-contest','men’s three-point contest':'men-s-three-point-contest',\n    'speed grab':'speed-grab','nuke ’em':'nuke-em','speed volleyball / volleyball':'speed-volleyball-volleyball',\n    'water tasting':'water-tasting','fill the water bottle':'fill-the-water-bottle','protect the balloon baby':'protect-the-balloon-baby',\n    'kids dodgeball':'kids-dodgeball','women’s dodgeball':'women-s-dodgeball','men’s dodgeball':'men-s-dodgeball'\n  };\n  const tournamentPath=name=>{const n=String(name||'').trim().toLowerCase();if(n.includes('cornhole'))return'/cornhole-tournament.html';if(n.includes('adult soccer'))return'/adult-soccer-tournament.html';if(n.includes('wiffle ball'))return'/wiffle-ball-tournament.html';if(n.includes('kids slip-and-slide'))return'/kids-slip-and-slide.html';if(n.includes('adult slip-and-slide'))return'/adult-slip-and-slide.html';if(n.includes('egg toss'))return'/egg-toss.html';return SCORECARD_EVENTS[n]?`/event-scorecard.html?event=${encodeURIComponent(SCORECARD_EVENTS[n])}`:''};
+  const SCORECARD_EVENTS={
+    'kahoot':'kahoot','kids soccer':'kids-soccer','junior basketball':'junior-basketball',
+    'women’s three-point contest':'women-s-three-point-contest','men’s three-point contest':'men-s-three-point-contest',
+    'speed grab':'speed-grab','nuke ’em':'nuke-em','speed volleyball / volleyball':'speed-volleyball-volleyball',
+    'water tasting':'water-tasting','fill the water bottle':'fill-the-water-bottle','protect the balloon baby':'protect-the-balloon-baby',
+    'kids dodgeball':'kids-dodgeball','women’s dodgeball':'women-s-dodgeball','men’s dodgeball':'men-s-dodgeball'
+  };
+  const tournamentPath=name=>{const n=String(name||'').trim().toLowerCase();if(n.includes('cornhole'))return'/cornhole-tournament.html';if(n.includes('adult soccer'))return'/adult-soccer-tournament.html';if(n.includes('wiffle ball'))return'/wiffle-ball-tournament.html';if(n.includes('kids slip-and-slide'))return'/kids-slip-and-slide.html';if(n.includes('adult slip-and-slide'))return'/adult-slip-and-slide.html';if(n.includes('egg toss'))return'/egg-toss.html';return SCORECARD_EVENTS[n]?`/event-scorecard.html?event=${encodeURIComponent(SCORECARD_EVENTS[n])}`:''};
   const isStandaloneTournament=name=>Boolean(tournamentPath(name));
   const tournamentSrc=path=>`${path}${path.includes('?')?'&':'?'}${document.body.classList.contains('control-mode')?'control=1':'view=1'}&v=${encodeURIComponent(TOURNAMENT_ASSET_VERSION)}`;
   const openStandaloneTournament=path=>{window.location.href=tournamentSrc(path)};
