@@ -3,34 +3,107 @@
   const load=document.querySelector('#load-nfc-cards');
   const message=document.querySelector('#nfc-admin-message');
   const list=document.querySelector('#nfc-card-list');
+  const tools=document.querySelector('#nfc-tools');
+  const search=document.querySelector('#nfc-player-search');
+  const clearSearch=document.querySelector('#nfc-clear-search');
+  const filter=document.querySelector('#nfc-player-filter');
+  const visibleCount=document.querySelector('#nfc-visible-count');
+  const visibleLabel=document.querySelector('#nfc-visible-label');
   if(!code||!load||!message||!list)return;
 
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let cards=[];
+  let toastTimer=null;
+
+  const savedCode=sessionStorage.getItem('schaferOlympicsNfcAdminCode')||sessionStorage.getItem('schaferOlympicsControlCode')||'';
+  if(savedCode)code.value=savedCode;
+
+  function initials(name){
+    const bits=String(name||'').trim().split(/\s+/).filter(Boolean);
+    return bits.slice(0,2).map(x=>x[0]?.toUpperCase()||'').join('')||'?';
+  }
 
   function formatUsed(value){
     if(!value)return 'Never tapped';
     const date=new Date(value);
-    return Number.isNaN(date.getTime())?'Previously tapped':`Last tapped ${date.toLocaleString()}`;
+    if(Number.isNaN(date.getTime()))return 'Previously tapped';
+    const now=Date.now();
+    const diff=Math.max(0,now-date.getTime());
+    if(diff<60*1000)return 'Tapped just now';
+    if(diff<60*60*1000)return `Tapped ${Math.max(1,Math.round(diff/60000))} min ago`;
+    if(diff<24*60*60*1000)return `Tapped ${Math.max(1,Math.round(diff/3600000))} hr ago`;
+    return `Last tapped ${date.toLocaleDateString(undefined,{month:'short',day:'numeric'})}`;
+  }
+
+  function showToast(text){
+    let toast=document.querySelector('.nfc-toast');
+    if(!toast){
+      toast=document.createElement('div');
+      toast.className='nfc-toast';
+      toast.setAttribute('role','status');
+      document.body.appendChild(toast);
+    }
+    toast.textContent=text;
+    toast.classList.add('is-visible');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>toast.classList.remove('is-visible'),1800);
+  }
+
+  function filteredCards(){
+    const q=String(search?.value||'').trim().toLowerCase();
+    const mode=filter?.value||'all';
+    return cards.filter(card=>{
+      if(q&&!`${card.name||''} ${card.team||''}`.toLowerCase().includes(q))return false;
+      if(mode==='never'&&card.lastUsedAt)return false;
+      if(mode==='used'&&!card.lastUsedAt)return false;
+      if(mode==='active'&&!card.active)return false;
+      if(mode==='inactive'&&card.active)return false;
+      return true;
+    });
+  }
+
+  function updateCount(count){
+    if(visibleCount)visibleCount.textContent=String(count);
+    if(visibleLabel)visibleLabel.textContent=count===1?'player':'players';
+  }
+
+  function cardMarkup(card){
+    const used=Boolean(card.lastUsedAt);
+    return `<article class="nfc-card" data-player="${esc(card.participantId)}">
+      <div class="nfc-card__heading">
+        <div class="nfc-player-identity">
+          <span class="nfc-player-avatar" aria-hidden="true">${esc(initials(card.name))}</span>
+          <div class="nfc-player-copy"><strong>${esc(card.name)}</strong><span>${esc(card.team||'Team not assigned')}</span></div>
+        </div>
+        <span class="nfc-card__status ${card.active?'is-active':'is-inactive'}">${card.active?'Active':'Inactive'}</span>
+      </div>
+      <div class="nfc-card__meta ${used?'is-used':''}">${used?'✓':'○'} ${esc(formatUsed(card.lastUsedAt))}</div>
+      <div class="nfc-card__actions">
+        <button type="button" class="nfc-copy-button" data-action="copy">Copy Link</button>
+        <a class="nfc-open-button" href="${esc(card.url||'#')}" target="_blank" rel="noopener">Open Player Page</a>
+      </div>
+      <details class="nfc-more">
+        <summary>More options</summary>
+        <div class="nfc-more__body">
+          <label class="nfc-url"><span>Full player link</span><input type="text" readonly value="${esc(card.url||'')}"/></label>
+          <button type="button" class="nfc-rotate-button" data-action="rotate">Rotate link / replace card</button>
+        </div>
+      </details>
+    </article>`;
   }
 
   function render(){
     if(!cards.length){
-      list.innerHTML='<p class="panel-note">No player NFC links were found.</p>';
+      tools && (tools.hidden=true);
+      updateCount(0);
+      list.innerHTML='<div class="nfc-empty-state"><span>👥</span><strong>No player links found</strong><p>Try loading the player list again.</p></div>';
       return;
     }
-    list.innerHTML=cards.map(card=>`<article class="panel nfc-card" data-player="${esc(card.participantId)}">
-      <div class="nfc-card__heading">
-        <div><strong>${esc(card.name)}</strong><span>${esc(card.team||'Team not assigned')}</span></div>
-        <span class="nfc-card__status ${card.active?'is-active':'is-inactive'}">${card.active?'Active':'Inactive'}</span>
-      </div>
-      <label class="nfc-url"><span>NFC URL</span><input type="text" readonly value="${esc(card.url||'')}"/></label>
-      <div class="nfc-card__meta">${esc(formatUsed(card.lastUsedAt))}</div>
-      <div class="nfc-card__actions">
-        <button type="button" class="save-score" data-action="copy">Copy URL</button>
-        <button type="button" class="nfc-secondary" data-action="rotate">Rotate Card Link</button>
-      </div>
-    </article>`).join('');
+    if(tools)tools.hidden=false;
+    const shown=filteredCards();
+    updateCount(shown.length);
+    if(clearSearch)clearSearch.hidden=!String(search?.value||'').length;
+    list.innerHTML=shown.length?shown.map(cardMarkup).join(''):'<div class="nfc-no-results"><strong>No matching players</strong><br/>Try a different name or filter.</div>';
   }
 
   async function api(action,participantId){
@@ -40,57 +113,82 @@
       body:JSON.stringify({code:code.value,action,participantId}),
     });
     const data=await r.json();
-    if(!r.ok)throw new Error(data.error||'Unable to load NFC cards.');
-    cards=data.cards||[];
+    if(!r.ok)throw new Error(data.error||'Unable to load player cards.');
+    cards=(data.cards||[]).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
     render();
     return data;
   }
 
-  load.addEventListener('click',async()=>{
+  async function loadPlayers(){
+    if(!code.value.trim()){
+      message.textContent='Enter the admin code first.';
+      code.focus();
+      return;
+    }
     load.disabled=true;
-    message.textContent='Loading…';
+    load.textContent='Loading…';
+    message.textContent='';
     try{
       const data=await api('list');
-      message.textContent=`✓ ${data.count||cards.length} player links loaded`;
+      sessionStorage.setItem('schaferOlympicsNfcAdminCode',code.value);
+      message.textContent=`✓ ${data.count||cards.length} players loaded`;
+      if(search)search.focus();
     }catch(e){
       message.textContent=e.message;
     }finally{
       load.disabled=false;
+      load.textContent='Load Players';
     }
-  });
+  }
+
+  load.addEventListener('click',loadPlayers);
+  code.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();loadPlayers()}});
+  search?.addEventListener('input',render);
+  filter?.addEventListener('change',render);
+  clearSearch?.addEventListener('click',()=>{search.value='';render();search.focus()});
 
   list.addEventListener('click',async event=>{
     const button=event.target.closest('button[data-action]');
     if(!button)return;
     const cardEl=button.closest('[data-player]');
     const participantId=cardEl?.dataset.player;
-    const card=cards.find(x=>x.participantId===participantId);
+    const card=cards.find(x=>String(x.participantId)===String(participantId));
     if(!card)return;
 
     if(button.dataset.action==='copy'){
+      const original=button.textContent;
       try{
-        await navigator.clipboard.writeText(card.url||'');
-        message.textContent=`✓ Copied ${card.name}'s NFC URL`;
+        if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(card.url||'');
+        else throw new Error('clipboard unavailable');
       }catch{
         const input=cardEl.querySelector('.nfc-url input');
         input?.select();
         document.execCommand('copy');
-        message.textContent=`✓ Copied ${card.name}'s NFC URL`;
       }
+      button.textContent='Copied ✓';
+      button.classList.add('is-copied');
+      showToast(`${card.name} link copied`);
+      setTimeout(()=>{button.textContent=original;button.classList.remove('is-copied')},1500);
       return;
     }
 
     if(button.dataset.action==='rotate'){
-      if(!window.confirm(`Rotate ${card.name}'s NFC link? The old NFC card link will stop working immediately.`))return;
+      if(!window.confirm(`Replace ${card.name}'s player link? Their old NFC card will stop working immediately.`))return;
       button.disabled=true;
-      message.textContent=`Rotating ${card.name}'s link…`;
+      button.textContent='Rotating…';
       try{
         await api('rotate',participantId);
-        message.textContent=`✓ ${card.name}'s NFC link was rotated. Re-write the card with the new URL.`;
+        message.textContent=`✓ ${card.name}'s link was replaced. Write the new link to their card.`;
+        showToast(`${card.name} link replaced`);
+        requestAnimationFrame(()=>{
+          const updated=[...list.querySelectorAll('[data-player]')].find(x=>x.dataset.player===String(participantId));
+          updated?.scrollIntoView({block:'center',behavior:'smooth'});
+        });
       }catch(e){
         message.textContent=e.message;
       }finally{
         button.disabled=false;
+        button.textContent='Rotate link / replace card';
       }
     }
   });
