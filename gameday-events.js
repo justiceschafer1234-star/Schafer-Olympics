@@ -23,7 +23,7 @@
   const tournamentPath=name=>{const n=String(name||'').trim().toLowerCase();if(n.includes('cornhole'))return'/cornhole-tournament.html';if(n.includes('adult soccer'))return'/adult-soccer.html';if(n==='kids soccer')return'/kids-soccer.html';if(n.includes('wiffle ball'))return'/wiffle-ball-tournament.html';if(n.includes('kids slip-and-slide'))return'/kids-slip-and-slide.html';if(n.includes('adult slip-and-slide'))return'/adult-slip-and-slide.html';if(n.includes('egg toss'))return'/egg-toss.html';return SCORECARD_EVENTS[n]?`/event-scorecard.html?event=${encodeURIComponent(SCORECARD_EVENTS[n])}`:''};
   const isStandaloneTournament=name=>Boolean(tournamentPath(name));
   const tournamentSrc=path=>`${path}${path.includes('?')?'&':'?'}${document.body.classList.contains('control-mode')?'control=1':'view=1'}&v=${encodeURIComponent(TOURNAMENT_ASSET_VERSION)}`;
-  const openStandaloneTournament=path=>{window.location.href=tournamentSrc(path)};
+  const openStandaloneTournament=path=>{sessionStorage.setItem('schaferOlympicsReturnTab','events');window.location.href=tournamentSrc(path)};
   const isTeamEvent=p=>!/individual/i.test(String(p?.Format||''));
   const asTeams=v=>(Array.isArray(v)?v:v?[v]:[]).filter(Boolean);
   const podium=p=>{const bits=[];const gold=asTeams(p['🥇 Team']),silver=asTeams(p['🥈 Team']),bronze=asTeams(p['🥉 Team']);if(gold.length)bits.push(`🥇 ${gold.map(x=>esc(String(x).replace('Team ',''))).join(' + ')}`);if(silver.length)bits.push(`🥈 ${silver.map(x=>esc(String(x).replace('Team ',''))).join(' + ')}`);if(bronze.length)bits.push(`🥉 ${bronze.map(x=>esc(String(x).replace('Team ',''))).join(' + ')}`);return bits.join('<span>•</span>')};
