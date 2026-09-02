@@ -23,13 +23,11 @@
 
     let score=0;
     let openingConflicts=0;
-
-    // These are the four immediately scheduled matchups in the current
-    // 10-team Cornhole bracket. Same Olympic-team matchups are heavily
-    // penalized so the randomizer avoids them whenever a valid draw exists.
-    const openingPairs=order.length===10
-      ? [[8,9],[7,10],[4,5],[3,6]]
-      : [];
+    const openingPairs=order.length===12
+      ? [[5,12],[6,11],[7,10],[8,9]]
+      : order.length===10
+        ? [[8,9],[7,10],[4,5],[3,6]]
+        : [];
 
     for(const [a,b] of openingPairs){
       if(sameTeam(a,b)){
@@ -38,16 +36,16 @@
       }
     }
 
-    // Seeds 1 and 2 enter against winners from these early paths. This is a
-    // softer penalty because the opponent is not known yet, but it helps keep
-    // Olympic teammates separated deeper into the bracket when possible.
-    if(order.length===10){
+    if(order.length===12){
+      for(const b of [8,9])if(sameTeam(1,b))score+=100;
+      for(const b of [7,10])if(sameTeam(2,b))score+=100;
+      for(const b of [6,11])if(sameTeam(3,b))score+=100;
+      for(const b of [5,12])if(sameTeam(4,b))score+=100;
+    }else if(order.length===10){
       for(const b of [8,9])if(sameTeam(1,b))score+=100;
       for(const b of [7,10])if(sameTeam(2,b))score+=100;
     }
 
-    // Small tie-breaker to spread teams throughout the seed list rather than
-    // clustering all pairs from one Olympic team together.
     for(let seed=1;seed<order.length;seed++){
       if(sameTeam(seed,seed+1))score+=2;
     }
@@ -65,15 +63,12 @@
 
     let best=null;
     let bestResult={score:Infinity,openingConflicts:Infinity};
-    const attempts=Math.max(3000,pairs.length*500);
+    const attempts=Math.max(5000,pairs.length*700);
 
     for(let i=0;i<attempts;i++){
       const candidate=shuffle(pairs);
       const result=scoreDraw(candidate);
-      if(
-        result.score<bestResult.score ||
-        (result.score===bestResult.score&&Math.random()<0.2)
-      ){
+      if(result.score<bestResult.score||(result.score===bestResult.score&&Math.random()<0.2)){
         best=candidate;
         bestResult=result;
         if(result.score===0)break;
@@ -86,8 +81,6 @@
   document.addEventListener('click',event=>{
     const button=event.target.closest?.('#cornhole-seed-random');
     if(!button)return;
-
-    // Override the basic shuffle installed by team-editor.js.
     event.preventDefault();
     event.stopImmediatePropagation();
 
@@ -108,7 +101,7 @@
 
     if(message){
       message.textContent=result.openingConflicts===0
-        ? '🎲 Team-aware draw ready — no same-team opening matchups.'
+        ? `🎲 ${selects.length}-pair team-aware draw ready — no same-team opening matchups.`
         : `🎲 Best draw found — ${result.openingConflicts} same-team opening matchup${result.openingConflicts===1?'':'s'} could not be avoided.`;
     }
   },true);
