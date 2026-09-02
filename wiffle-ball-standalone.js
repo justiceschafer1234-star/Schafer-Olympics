@@ -1,25 +1,32 @@
 (()=>{
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const control=new URLSearchParams(location.search).get('control')==='1';
-let matches=[];
+const TEAM_CLASS={'Team Red':'team-red','Team Blue':'team-blue','Team Green':'team-green','Team Gold':'team-gold'};
+let matches=[],rosters={};
 const code=()=>sessionStorage.getItem('schaferOlympicsControlCode')||'';
 const by=c=>matches.find(m=>m.properties?.Match===c),p=c=>by(c)?.properties||{};
+const teamShort=t=>String(t||'').replace('Team ','');
+const teamClass=t=>TEAM_CLASS[t]||'';
+const members=t=>(rosters[t]||[]).filter(Boolean);
+function memberLine(team){const people=members(team);return people.length?`<div class="team-members">${people.map(n=>`<span>${esc(n)}</span>`).join('')}</div>`:'<div class="team-members empty">No registered members</div>'}
+function teamBlock(team,sub=''){if(!team)return `<div class="team-block placeholder"><strong>${esc(sub||'Awaiting result')}</strong></div>`;return `<div class="team-block ${teamClass(team)}"><div class="team-name-row"><span class="team-dot" aria-hidden="true"></span><strong>${esc(team)}</strong></div>${memberLine(team)}</div>`}
 function seedOrder(){const a=p('SF1'),b=p('SF2');return [a['Team A'],b['Team A'],b['Team B'],a['Team B']].filter(Boolean)}
 function statusClass(s){return String(s||'Waiting').toLowerCase().replaceAll(' ','-')}
-function slot(team,score,done,winner,placeholder='Awaiting result'){return `<div class="slot${done&&team===winner?' is-winner':''}${team?'':' placeholder'}"><div><strong>${esc(team||placeholder)}</strong></div>${done&&score!=null?`<b class="score">${esc(score)}</b>`:''}</div>`}
+function slot(team,score,done,winner,placeholder='Awaiting result'){return `<div class="slot ${teamClass(team)}${done&&team===winner?' is-winner':''}${team?'':' placeholder'}">${teamBlock(team,placeholder)}${done&&score!=null?`<b class="score">${esc(score)}</b>`:''}</div>`}
 function card(c,title,placeholderA='Awaiting result',placeholderB='Awaiting result'){
   const m=by(c),x=m?.properties||{},done=x.Status==='Complete',ready=x.Status==='Ready',clickable=control&&(ready||done)&&x['Team A']&&x['Team B'];
   return `<article class="match ${statusClass(x.Status)}${clickable?' clickable':''}" data-id="${esc(m?.id||'')}" ${clickable?'tabindex="0" role="button"':''}><div class="match-head"><strong>${esc(title)}</strong><span>${clickable?(done?'Tap to edit score':'Tap to score'):esc(x.Status||'Waiting')}</span></div>${slot(x['Team A'],x['Score A'],done,x.Winner,placeholderA)}${slot(x['Team B'],x['Score B'],done,x.Winner,placeholderB)}</article>`;
 }
+function finishRow(label,place,team){return `<article class="seed-row ${teamClass(team)}"><div class="seed-badge"><span>${label}</span><strong>${place}</strong></div>${teamBlock(team,'Awaiting result')}</article>`}
 function render(){
   const seeds=seedOrder(),complete=matches.filter(m=>m.properties?.Status==='Complete').length,ready=matches.filter(m=>m.properties?.Status==='Ready').length;
-  $('#seed-list').innerHTML=seeds.length===4?seeds.map((t,i)=>`<article class="seed-row"><div class="seed-badge"><span>Seed</span><strong>${i+1}</strong></div><div class="seed-team"><strong>${esc(t)}</strong></div></article>`).join(''):'<div class="loading">0 teams seeded</div>';
+  $('#seed-list').innerHTML=seeds.length===4?seeds.map((t,i)=>`<article class="seed-row ${teamClass(t)}"><div class="seed-badge"><span>Seed</span><strong>${i+1}</strong></div>${teamBlock(t)}</article>`).join(''):'<div class="loading">0 teams seeded</div>';
   $('#seeded-count').textContent=String(seeds.length);
   $('#bracket-status').textContent=seeds.length?`${complete} complete · ${ready} ready`:'0 teams';
   $('#semifinals').innerHTML=`<section class="round"><div class="round-title"><strong>Semifinals</strong><span>2 matches</span></div>${card('SF1','Semifinal 1')}${card('SF2','Semifinal 2')}</section>`;
   $('#medal-games').innerHTML=`<section class="round"><div class="round-title"><strong>Medal Games</strong><span>2 matches</span></div>${card('B','🥉 Third Place','Loser of Semifinal 1','Loser of Semifinal 2')}${card('F','🏆 Championship','Winner of Semifinal 1','Winner of Semifinal 2')}</section>`;
   const f=p('F'),b=p('B');
-  $('#podium').innerHTML=`<div class="seed-list"><article class="seed-row"><div class="seed-badge"><span>🥇</span><strong>1</strong></div><div class="seed-team"><strong>${esc(f.Winner||'Awaiting result')}</strong></div></article><article class="seed-row"><div class="seed-badge"><span>🥈</span><strong>2</strong></div><div class="seed-team"><strong>${esc(f.Loser||'Awaiting result')}</strong></div></article><article class="seed-row"><div class="seed-badge"><span>🥉</span><strong>3</strong></div><div class="seed-team"><strong>${esc(b.Winner||'Awaiting result')}</strong></div></article><article class="seed-row"><div class="seed-badge"><span>4th</span><strong>4</strong></div><div class="seed-team"><strong>${esc(b.Loser||'Awaiting result')}</strong></div></article></div>`;
+  $('#podium').innerHTML=`<div class="seed-list">${finishRow('🥇','1',f.Winner)}${finishRow('🥈','2',f.Loser)}${finishRow('🥉','3',b.Winner)}${finishRow('4th','4',b.Loser)}</div>`;
   bind();
 }
 function bind(){document.querySelectorAll('.match.clickable').forEach(el=>{el.onclick=()=>openScore(el.dataset.id);el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openScore(el.dataset.id)}}})}
@@ -28,8 +35,8 @@ function openScore(id){
   const x=m.properties,done=x.Status==='Complete',s=$('#score-sheet');if(!(x.Status==='Ready'||done)||!x['Team A']||!x['Team B'])return;
   s.dataset.matchId=id;
   $('#score-sheet-title').textContent=`${x.Match} · ${done?'Edit Score':'Enter Score'}`;
-  $('#score-sheet-teams').innerHTML=`<div><strong>${esc(x['Team A'])}</strong></div><span>vs</span><div><strong>${esc(x['Team B'])}</strong></div>`;
-  $('#score-sheet-fields').innerHTML=`<label><span>${esc(x['Team A'])}</span><input name="a" type="number" min="0" value="${x['Score A']??''}" required></label><label><span>${esc(x['Team B'])}</span><input name="b" type="number" min="0" value="${x['Score B']??''}" required></label>`;
+  $('#score-sheet-teams').innerHTML=`${teamBlock(x['Team A'])}<span>vs</span>${teamBlock(x['Team B'])}`;
+  $('#score-sheet-fields').innerHTML=`<label class="${teamClass(x['Team A'])}"><span>${esc(x['Team A'])}</span><input name="a" type="number" min="0" value="${x['Score A']??''}" required></label><label class="${teamClass(x['Team B'])}"><span>${esc(x['Team B'])}</span><input name="b" type="number" min="0" value="${x['Score B']??''}" required></label>`;
   $('#score-sheet-status').textContent=done?'Editing a completed game. If the winner changes, affected medal games will be reset.':'';
   s.hidden=false;document.body.classList.add('modal-open');
 }
@@ -59,7 +66,18 @@ async function randomSeed(){
     if(!r.ok)throw new Error(d.error||'Could not seed Wiffle Ball.');matches=d.matches||matches;render();if(msg)msg.textContent='🎲 Random seeding saved.';
   }catch(e){if(msg)msg.textContent=e.message||'Could not seed Wiffle Ball.';else alert(e.message)}finally{btn.disabled=false}
 }
-async function load(){try{const r=await fetch('/api/wiffle-ball',{cache:'no-store'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load Wiffle Ball.');matches=d.matches||[];render()}catch(e){$('#bracket-status').textContent='Load error';$('#semifinals').innerHTML=`<div class="loading error">${esc(e.message)}</div>`;$('#medal-games').innerHTML=''}}
+async function loadRosters(){
+  try{
+    const scoresResponse=await fetch('/api/scores',{cache:'no-store'}),scores=await scoresResponse.json();
+    if(!scoresResponse.ok)throw new Error('Could not locate Wiffle Ball event.');
+    const row=(scores.rows||[]).find(r=>/wiffle ball/i.test(String(r.properties?.Event||'')));
+    if(!row?.id)throw new Error('Wiffle Ball event not found.');
+    const r=await fetch(`/api/event-rosters?eventId=${encodeURIComponent(row.id)}`,{cache:'no-store'}),d=await r.json();
+    if(!r.ok)throw new Error(d.error||'Could not load Wiffle Ball rosters.');
+    rosters=Object.fromEntries((d.rosters||[]).map(x=>[x.team,x.participants||[]]));
+  }catch{rosters={}}
+}
+async function load(){try{const [r]=await Promise.all([fetch('/api/wiffle-ball',{cache:'no-store'}),loadRosters()]),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load Wiffle Ball.');matches=d.matches||[];render()}catch(e){$('#bracket-status').textContent='Load error';$('#semifinals').innerHTML=`<div class="loading error">${esc(e.message)}</div>`;$('#medal-games').innerHTML=''}}
 if(!control)$('#seed-actions').hidden=true;else $('#random-seed').onclick=randomSeed;
 $('#score-sheet-form').addEventListener('submit',save);document.querySelectorAll('[data-close-score]').forEach(x=>x.onclick=close);document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});load();
 })();
