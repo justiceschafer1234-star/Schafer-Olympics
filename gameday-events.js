@@ -8,16 +8,16 @@
   let scoreData=null;
   let detail=null;
   let openRow=null;
-  const TOURNAMENT_ASSET_VERSION='2026-09-01-standalone-tournaments-2';
+  const TOURNAMENT_ASSET_VERSION='2026-09-02-slip-slide-1';
 
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const teamClass={'Team Red':'team-red','Team Blue':'team-blue','Team Green':'team-green','Team Gold':'team-gold'};
   const teamShort=t=>String(t||'').replace('Team ','');
-  const tournamentPath=name=>{const n=String(name||'').toLowerCase();if(n.includes('cornhole'))return'/cornhole-tournament.html';if(n.includes('adult soccer'))return'/adult-soccer-tournament.html';if(n.includes('wiffle ball'))return'/wiffle-ball-tournament.html';return''};
-  const isStandaloneTournament=name=>{const n=String(name||'').toLowerCase();return n.includes('cornhole')||n.includes('wiffle ball')};
+  const tournamentPath=name=>{const n=String(name||'').toLowerCase();if(n.includes('cornhole'))return'/cornhole-tournament.html';if(n.includes('adult soccer'))return'/adult-soccer-tournament.html';if(n.includes('wiffle ball'))return'/wiffle-ball-tournament.html';if(n.includes('kids slip-and-slide'))return'/kids-slip-and-slide.html';if(n.includes('adult slip-and-slide'))return'/adult-slip-and-slide.html';return''};
+  const isStandaloneTournament=name=>{const n=String(name||'').toLowerCase();return n.includes('cornhole')||n.includes('wiffle ball')||n.includes('slip-and-slide')};
   const tournamentSrc=path=>`${path}?${document.body.classList.contains('control-mode')?'control=1':'view=1'}&v=${encodeURIComponent(TOURNAMENT_ASSET_VERSION)}`;
   const openStandaloneTournament=path=>{window.location.href=tournamentSrc(path)};
-  const isTeamEvent=p=>/team/i.test(String(p?.Format||''));
+  const isTeamEvent=p=>!/individual/i.test(String(p?.Format||''));
   const podium=p=>{const bits=[];const gold=Array.isArray(p['🥇 Team'])?p['🥇 Team'][0]:p['🥇 Team'];const silver=Array.isArray(p['🥈 Team'])?p['🥈 Team'][0]:p['🥈 Team'];const bronze=Array.isArray(p['🥉 Team'])?p['🥉 Team']:p['🥉 Team']?[p['🥉 Team']]:[];if(gold)bits.push(`🥇 ${esc(String(gold).replace('Team ',''))}`);if(silver)bits.push(`🥈 ${esc(String(silver).replace('Team ',''))}`);if(bronze.length)bits.push(`🥉 ${bronze.map(x=>esc(String(x).replace('Team ',''))).join(' + ')}`);return bits.join('<span>•</span>')};
 
   async function getScores(force=false){
@@ -49,12 +49,12 @@
     if(!host)return;
     if(!isTeamEvent(p)){host.hidden=true;host.innerHTML='';return}
     host.hidden=false;
-    host.innerHTML='<div class="panel__header"><div><p class="section-kicker">Registered for this event</p><h3>Team Participants</h3></div></div><div class="event-roster-loading">Loading registered players…</div>';
+    host.innerHTML='<div class="panel__header"><div><p class="section-kicker">Registered for this event</p><h3>Teams</h3></div></div><div class="event-roster-loading">Loading team participants…</div>';
     try{
       const r=await fetch(`/api/event-rosters?eventId=${encodeURIComponent(row.id)}`,{cache:'no-store'}),d=await r.json();
       if(!r.ok||d.error)throw new Error(d.error||'Could not load event participants');
-      host.innerHTML=`<div class="panel__header"><div><p class="section-kicker">Registered for this event</p><h3>Team Participants</h3></div><strong class="event-roster-total">${Number(d.registeredCount||0)} registered</strong></div><div class="event-roster-grid">${(d.rosters||[]).map(x=>`<article class="event-roster-card ${teamClass[x.team]||''}"><h4>${esc(teamShort(x.team))} Team</h4>${x.participants?.length?`<div class="event-roster-names">${x.participants.map(name=>`<span>${esc(name)}</span>`).join('')}</div>`:'<p>No registered participants.</p>'}</article>`).join('')}</div>${d.unassigned?.length?`<div class="event-roster-unassigned"><strong>Registered but not assigned to an Olympic team:</strong> ${d.unassigned.map(esc).join(', ')}</div>`:''}`;
-    }catch(e){host.innerHTML=`<div class="panel__header"><div><p class="section-kicker">Registered for this event</p><h3>Team Participants</h3></div></div><div class="event-roster-error">${esc(e.message||'Could not load participants.')}</div>`}
+      host.innerHTML=`<div class="panel__header"><div><p class="section-kicker">Registered for this event</p><h3>Teams</h3></div><strong class="event-roster-total">${Number(d.registeredCount||0)} registered</strong></div><div class="event-roster-grid">${(d.rosters||[]).map(x=>`<article class="event-roster-card ${teamClass[x.team]||''}"><h4>${esc(teamShort(x.team))} Team</h4>${x.participants?.length?`<div class="event-roster-names">${x.participants.map(name=>`<span>${esc(name)}</span>`).join('')}</div>`:'<p>No registered participants.</p>'}</article>`).join('')}</div>${d.unassigned?.length?`<div class="event-roster-unassigned"><strong>Registered but not assigned to an Olympic team:</strong> ${d.unassigned.map(esc).join(', ')}</div>`:''}`;
+    }catch(e){host.innerHTML=`<div class="panel__header"><div><p class="section-kicker">Registered for this event</p><h3>Teams</h3></div></div><div class="event-roster-error">${esc(e.message||'Could not load participants.')}</div>`}
   }
 
   function closeDetail(){
@@ -92,8 +92,8 @@
       box.querySelector('[data-detail-result]').innerHTML=podium(p)?`<div class="gameday-event-podium">${podium(p)}</div>`:'<div class="gameday-event-pending">No final result entered yet.</div>';
       const action=box.querySelector('[data-detail-action]'),tour=box.querySelector('[data-detail-tournament]');
       if(path){
-        action.innerHTML=document.body.classList.contains('control-mode')?'<p class="gameday-event-hint">Enter match scores directly in the live bracket below.</p>':'';
-        tour.hidden=false;tour.innerHTML=`<iframe class="gameday-tournament-frame" title="${esc(p.Event)} bracket" src="${tournamentSrc(path)}"></iframe>`;
+        action.innerHTML=document.body.classList.contains('control-mode')?'<p class="gameday-event-hint">Enter scores/times directly on the live event page below.</p>':'';
+        tour.hidden=false;tour.innerHTML=`<iframe class="gameday-tournament-frame" title="${esc(p.Event)}" src="${tournamentSrc(path)}"></iframe>`;
       }else{
         tour.hidden=true;tour.innerHTML='';
         if(document.body.classList.contains('control-mode')){
