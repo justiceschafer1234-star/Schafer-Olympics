@@ -16,57 +16,30 @@
       <div>
         <p class="eyebrow">Schafer Olympics 2026 · Event #20</p>
         <h1>Cornhole Tournament</h1>
-        <p class="subhead">10-team double elimination</p>
+        <p class="subhead">Up to 12 pairs · double elimination</p>
       </div>
       <a class="back-link" href="/gameday-hq">← Game Day HQ</a>
     </header>
 
     <section class="section seeding-section">
       <div class="section-title-row">
-        <div>
-          <p class="eyebrow">Tournament order</p>
-          <h2>Seeding</h2>
-        </div>
+        <div><p class="eyebrow">Tournament order</p><h2>Seeding</h2></div>
         <div class="seed-summary"><strong id="seeded-count">0</strong><span>of <span id="pair-count">0</span> seeded</span></div>
       </div>
-      <p class="section-copy">Teams come directly from the saved Cornhole team pairs. Unseeded teams stay visible and show N/A.</p>
+      <p class="section-copy">For 12 pairs, Seeds 1–4 receive first-round byes and Seeds 5–12 play the four preliminary matches.</p>
       <div id="seed-list" class="seed-list"><div class="loading">Loading Cornhole teams…</div></div>
     </section>
 
     <section class="section bracket-section">
-      <div class="section-title-row">
-        <div>
-          <p class="eyebrow">Double elimination</p>
-          <h2>Bracket</h2>
-        </div>
-        <div id="bracket-status" class="bracket-status">0 teams</div>
-      </div>
-
-      <div class="bracket-group">
-        <h3>Winners Bracket</h3>
-        <div class="bracket-scroll"><div id="winners-bracket" class="bracket winners"></div></div>
-      </div>
-
-      <div class="bracket-group">
-        <h3>Losers Bracket</h3>
-        <div class="bracket-scroll"><div id="losers-bracket" class="bracket losers"></div></div>
-      </div>
-
-      <div class="bracket-group finals-group">
-        <h3>Championship</h3>
-        <div id="finals-grid" class="finals-grid"></div>
-      </div>
+      <div class="section-title-row"><div><p class="eyebrow">Double elimination</p><h2>Bracket</h2></div><div id="bracket-status" class="bracket-status">0 teams</div></div>
+      <div class="bracket-group"><h3>Winners Bracket</h3><div class="bracket-scroll"><div id="winners-bracket" class="bracket winners"></div></div></div>
+      <div class="bracket-group"><h3>Losers Bracket</h3><div class="bracket-scroll"><div id="losers-bracket" class="bracket losers"></div></div></div>
+      <div class="bracket-group finals-group"><h3>Championship</h3><div id="finals-grid" class="finals-grid"></div></div>
     </section>
 
     <section class="section" id="final-leaderboard-section">
-      <div class="section-title-row">
-        <div>
-          <p class="eyebrow">Final results</p>
-          <h2>Cornhole Final Leaderboard</h2>
-        </div>
-        <div id="leaderboard-status" class="bracket-status">Waiting for finish</div>
-      </div>
-      <p class="leaderboard-note">Final double-elimination placement. Teams eliminated in the same round share a tied finish.</p>
+      <div class="section-title-row"><div><p class="eyebrow">Final results</p><h2>Cornhole Final Leaderboard</h2></div><div id="leaderboard-status" class="bracket-status">Waiting for finish</div></div>
+      <p class="leaderboard-note">Final double-elimination placement. Pairs eliminated in the same round share a tied finish.</p>
       <div id="final-leaderboard" class="final-leaderboard"><div class="loading">Final standings will appear when the tournament is complete.</div></div>
     </section>
   </main>
@@ -75,18 +48,13 @@
     <div class="score-sheet__backdrop" data-close-score></div>
     <section class="score-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="score-sheet-title">
       <button class="score-sheet__close" type="button" data-close-score aria-label="Close score entry">×</button>
-      <p class="eyebrow">Match score</p>
-      <h2 id="score-sheet-title">Enter result</h2>
+      <p class="eyebrow">Match score</p><h2 id="score-sheet-title">Enter result</h2>
       <div id="score-sheet-teams" class="score-sheet__teams"></div>
-      <form id="score-sheet-form" class="score-sheet__form">
-        <div id="score-sheet-fields"></div>
-        <button class="score-sheet__save" type="submit">Save Result</button>
-        <span id="score-sheet-status" class="score-sheet__status" aria-live="polite"></span>
-      </form>
+      <form id="score-sheet-form" class="score-sheet__form"><div id="score-sheet-fields"></div><button class="score-sheet__save" type="submit">Save Result</button><span id="score-sheet-status" class="score-sheet__status" aria-live="polite"></span></form>
     </section>
   </div>
 
-  <script src="/cornhole-tournament.js?v=20260902-final-leaderboard1" defer></script>
+  <script src="/cornhole-tournament.js?v=20260902-12team1" defer></script>
   <script src="/cornhole-final-details.js?v=1" defer></script>
   <script src="/tournament-clear-ui.js?v=20260901-clear1" defer></script>
 </body>
