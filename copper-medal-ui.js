@@ -1,0 +1,19 @@
+(()=>{
+const teams=v=>(Array.isArray(v)?v:v?[v]:[]).filter(Boolean);
+const short=t=>String(t||'').replace('Team ','');
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function copperTeams(p={}){return teams(p['Copper Team']?.length?p['Copper Team']:p['Bronze 2 Team'])}
+function bronzeTeams(p={}){return teams(p['Bronze 1 Team']?.length?p['Bronze 1 Team']:p['🥉 Team'])}
+function patchLabels(root=document){root.querySelectorAll('.seed-badge span,.rank').forEach(el=>{const t=el.textContent.trim();if(t==='4th'||t==='4.')el.textContent='🟤'});const label=root.querySelector('label.field span');root.querySelectorAll('label.field>span').forEach(el=>{if(el.textContent.trim()==='Bronze 2')el.textContent='🟤 Copper'});}
+if(typeof window.medalCounts==='function'){
+  window.medalCounts=function(rows){const names=['Team Red','Team Blue','Team Green','Team Gold'],counts=Object.fromEntries(names.map(t=>[t,{gold:0,silver:0,bronze:0,copper:0}]));(rows||[]).forEach(row=>{const p=row?.properties||{};teams(p['🥇 Team']).forEach(t=>{if(counts[t])counts[t].gold++});teams(p['🥈 Team']).forEach(t=>{if(counts[t])counts[t].silver++});bronzeTeams(p).forEach(t=>{if(counts[t])counts[t].bronze++});copperTeams(p).forEach(t=>{if(counts[t])counts[t].copper++})});return counts};
+}
+window.podiumText=function(p={}){const bits=[],gold=teams(p['🥇 Team']),silver=teams(p['🥈 Team']),bronze=bronzeTeams(p),copper=copperTeams(p);if(gold.length)bits.push(`🥇 ${gold.map(x=>esc(short(x))).join(' + ')}`);if(silver.length)bits.push(`🥈 ${silver.map(x=>esc(short(x))).join(' + ')}`);if(bronze.length)bits.push(`🥉 ${bronze.map(x=>esc(short(x))).join(' + ')}`);if(copper.length)bits.push(`🟤 ${copper.map(x=>esc(short(x))).join(' + ')}`);return bits.join('<span>•</span>')};
+if(document.querySelector('#medal-table')){
+  window.renderMedals=function(rows,standings){const counts=window.medalCounts(rows),rank=[...(standings||[])].sort((a,b)=>Number(b.points||0)-Number(a.points||0)),slug=t=>({'Team Red':'team-red','Team Blue':'team-blue','Team Green':'team-green','Team Gold':'team-gold'}[t]||''),fmt=n=>new Intl.NumberFormat(undefined,{maximumFractionDigits:2}).format(Number(n)||0);document.querySelector('#medal-table').innerHTML=`<div class="medal-row header"><span>#</span><span>Team</span><span>🥇</span><span>🥈</span><span>🥉</span><span>🟤</span><span>Points</span></div>`+rank.map((team,i)=>{const c=counts[team.team]||{gold:0,silver:0,bronze:0,copper:0};return `<div class="medal-row ${slug(team.team)}"><span>${i+1}</span><span class="medal-team">${esc(team.team)}</span><span class="medal-count">${c.gold}</span><span class="medal-count">${c.silver}</span><span class="medal-count">${c.bronze}</span><span class="medal-count">${c.copper}</span><span class="medal-count">${fmt(team.points)}</span></div>`}).join('');if(typeof window.renderBarChart==='function')window.renderBarChart(document.querySelector('#gold-chart'),rank.map(t=>({team:t.team,gold:counts[t.team]?.gold||0})),'gold')};
+}
+async function patchDetail(){const box=document.querySelector('#gameday-event-detail:not([hidden])'),title=box?.querySelector('[data-detail-title]')?.textContent?.trim();if(!box||!title)return;try{const r=await fetch('/api/scores',{cache:'no-store'}),d=await r.json();const row=(d.rows||[]).find(x=>String(x.properties?.Event||'').trim()===title),p=row?.properties||{},c=copperTeams(p);if(!c.length)return;const host=box.querySelector('[data-detail-result] .gameday-event-podium');if(host&&!host.querySelector('[data-copper-medal]'))host.insertAdjacentHTML('beforeend',`<span data-copper-medal>•</span><span data-copper-medal>🟤 ${c.map(x=>esc(short(x))).join(' + ')}</span>`)}catch{}}
+const run=()=>{patchLabels();patchDetail()};
+new MutationObserver(run).observe(document.documentElement,{childList:true,subtree:true});
+window.addEventListener('DOMContentLoaded',run);run();
+})();
