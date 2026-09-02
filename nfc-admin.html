@@ -4,30 +4,66 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
   <meta name="theme-color" content="#eaf5ff"/>
-  <title>Schafer Olympics | NFC Player Cards</title>
+  <title>Schafer Olympics | Player Card Setup</title>
   <meta name="robots" content="noindex,nofollow"/>
   <link rel="stylesheet" href="/styles.css"/>
-  <link rel="stylesheet" href="/nfc-admin.css"/>
+  <link rel="stylesheet" href="/nfc-admin.css?v=2"/>
 </head>
-<body>
+<body class="nfc-admin-body">
   <main class="nfc-admin">
     <div class="nfc-admin__wrap">
-      <p class="eyebrow">🏅 Schafer Olympics 2026</p>
-      <h1>NFC Player Cards</h1>
-      <p class="nfc-admin__intro">Each player link opens Game Day HQ directly to that player’s My Stats tab, including their personal event schedule and results. Write the URL to the player’s NFC card as a website/URL record.</p>
+      <header class="nfc-admin__header">
+        <a class="nfc-back-link" href="/gameday-hq.html">← Game Day HQ</a>
+        <p class="eyebrow">🏅 Schafer Olympics 2026</p>
+        <h1>Player Card Setup</h1>
+        <p class="nfc-admin__intro">Find a player, copy their link, write it to their NFC card, then open the player page to test it.</p>
+      </header>
 
-      <section class="panel nfc-login">
-        <label class="field field--wide"><span>Admin code</span><input id="nfc-admin-code" type="password" autocomplete="current-password"/></label>
-        <button id="load-nfc-cards" class="save-score" type="button">Load Player Links</button>
-        <span id="nfc-admin-message" class="admin-message" aria-live="polite"></span>
+      <section class="nfc-login" aria-label="Admin access">
+        <label class="nfc-code-field">
+          <span>Admin code</span>
+          <input id="nfc-admin-code" type="password" autocomplete="current-password" placeholder="Enter control code"/>
+        </label>
+        <button id="load-nfc-cards" class="save-score nfc-load-button" type="button">Load Players</button>
+        <span id="nfc-admin-message" class="nfc-message" aria-live="polite"></span>
       </section>
 
+      <section id="nfc-tools" class="nfc-tools" hidden>
+        <div class="nfc-search-wrap">
+          <span aria-hidden="true">⌕</span>
+          <input id="nfc-player-search" type="search" autocomplete="off" placeholder="Search player name…" aria-label="Search players"/>
+          <button id="nfc-clear-search" class="nfc-clear-search" type="button" aria-label="Clear search" hidden>×</button>
+        </div>
+        <select id="nfc-player-filter" class="nfc-filter" aria-label="Filter player cards">
+          <option value="all">All players</option>
+          <option value="never">Never tapped</option>
+          <option value="used">Previously tapped</option>
+          <option value="active">Active only</option>
+          <option value="inactive">Inactive only</option>
+        </select>
+        <div class="nfc-list-summary"><strong id="nfc-visible-count">0</strong><span id="nfc-visible-label">players</span></div>
+      </section>
+
+      <details id="nfc-help" class="nfc-help">
+        <summary>How to write a player card</summary>
+        <div class="nfc-help__steps">
+          <span><b>1</b> Find the player.</span>
+          <span><b>2</b> Tap <strong>Copy Link</strong>.</span>
+          <span><b>3</b> In your NFC writing app, create a Website/URL record and paste it.</span>
+          <span><b>4</b> Write the card, then tap <strong>Open Player Page</strong> or scan the card to test.</span>
+        </div>
+      </details>
+
       <section id="nfc-card-list" class="nfc-card-list" aria-live="polite">
-        <p class="panel-note">Enter the admin code to load NFC links.</p>
+        <div class="nfc-empty-state">
+          <span>👥</span>
+          <strong>Player cards are ready to load</strong>
+          <p>Enter the admin code above to get started.</p>
+        </div>
       </section>
     </div>
   </main>
   <script src="/no-zoom.js" defer></script>
-  <script src="/nfc-admin.js" defer></script>
+  <script src="/nfc-admin.js?v=2" defer></script>
 </body>
 </html>
