@@ -8,7 +8,7 @@
   let scoreData=null;
   let detail=null;
   let openRow=null;
-  const TOURNAMENT_ASSET_VERSION='2026-09-02-egg-toss-1';
+  const TOURNAMENT_ASSET_VERSION='2026-09-02-event-scorecards-1';
 
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const teamClass={'Team Red':'team-red','Team Blue':'team-blue','Team Green':'team-green','Team Gold':'team-gold'};
