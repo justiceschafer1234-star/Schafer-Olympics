@@ -3,6 +3,8 @@ import app from './worker-kids-soccer.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 const base=e=>String(e.SUPABASE_URL||'').replace(/\/+$/,'').replace(/\/rest\/v1$/,'');
 const filter=v=>encodeURIComponent(String(v));
+const asArray=v=>(Array.isArray(v)?v:v?[v]:[]).filter(Boolean);
+const number=v=>Number.isFinite(Number(v))?Number(v):0;
 
 async function sb(env,path,init={}){
   const url=base(env);
@@ -32,7 +34,7 @@ async function resolvePlayer(env,rawToken){
   const tokens=await select(env,'player_nfc_tokens',`select=participant_id,token,active&token=eq.${filter(token)}&active=eq.true&limit=1`);
   const row=tokens[0];
   if(!row)return null;
-  const people=await select(env,'participants',`select=id,notion_page_id,participant,team,divisions&id=eq.${filter(row.participant_id)}&limit=1`);
+  const people=await select(env,'participants',`select=id,notion_page_id,participant,participant_key,team,divisions&id=eq.${filter(row.participant_id)}&limit=1`);
   const person=people[0];
   return person?{...person,token}:null;
 }
@@ -42,40 +44,124 @@ function touchToken(env,player,ctx){
   if(ctx?.waitUntil)ctx.waitUntil(promise);
 }
 
-async function nfcRegistration(request,env,ctx){
-  if(request.method==='GET'){
-    const token=request.headers.get('x-player-nfc');
-    if(!token)return app.fetch(request,env,ctx);
-    const player=await resolvePlayer(env,token);
-    if(!player)return json({error:'This NFC player card is invalid or inactive.'},401);
-    const upstream=await app.fetch(request,env,ctx);
-    let data;
-    try{data=await upstream.json()}catch{return json({error:'Unable to load player registration.'},502)}
-    if(!upstream.ok)return json(data,upstream.status);
-    const participant=(data.participants||[]).find(p=>p.id===player.notion_page_id);
-    if(!participant)return json({error:'The player linked to this NFC card was not found.'},404);
-    touchToken(env,player,ctx);
-    return json({
-      ...data,
-      playerMode:true,
-      participants:[{...participant,team:player.team||null}],
-      player:{id:participant.id,name:participant.name,team:player.team||null},
-    });
+function teamResult(event,team){
+  if(!team)return null;
+  const places=[
+    {place:1,label:'Gold',medal:'🥇',teams:event.gold_teams,points:event.gold_points},
+    {place:2,label:'Silver',medal:'🥈',teams:event.silver_teams,points:event.silver_points},
+    {place:3,label:'Bronze',medal:'🥉',teams:event.bronze_1_teams,points:event.bronze_1_points},
+    {place:4,label:'Copper',medal:'🟤',teams:event.bronze_2_teams,points:event.bronze_2_points},
+  ];
+  const found=places.find(x=>asArray(x.teams).includes(team));
+  return found?{place:found.place,label:found.label,medal:found.medal,points:number(found.points)}:null;
+}
+
+function rankedPlace(entries,value,target){
+  const rows=(entries||[]).filter(x=>value(x)!==null&&value(x)!==''&&Number.isFinite(Number(value(x)))).sort((a,b)=>Number(value(b))-Number(value(a))||String(a.label||'').localeCompare(String(b.label||'')));
+  let last=null,place=0;
+  for(let i=0;i<rows.length;i++){
+    const score=Number(value(rows[i]));
+    if(last===null||score!==last)place=i+1;
+    last=score;
+    if(target(rows[i]))return{place,score};
+  }
+  return null;
+}
+
+function personalScore(card,player,pairIds){
+  const state=card?.state&&typeof card.state==='object'?card.state:{};
+  const entries=Array.isArray(state.entries)?state.entries:[];
+  const mode=String(card?.format_key||'');
+  const isPlayer=e=>String(e?.id||'')===String(player.id)||String(e?.label||'').trim()===String(player.participant||'').trim();
+  const isPair=e=>pairIds.has(String(e?.id||''));
+  const target=mode==='pairs'?isPair:isPlayer;
+  const entry=entries.find(target);
+  if(!entry)return null;
+
+  if(mode==='bracket'){
+    const placements=Array.isArray(state.placements)?state.placements.map(String):[];
+    const idx=placements.indexOf(String(entry.id));
+    return{kind:'bracket',place:idx>=0?idx+1:null,label:entry.label||player.participant};
+  }
+  if(mode==='two-stage'){
+    const final=entry.advanced?rankedPlace(entries.filter(x=>x.advanced),x=>x.finalScore,target):null;
+    return{kind:'two-stage',place:final?.place||null,round1:entry.round1??entry.score??null,finalScore:entry.finalScore??null,advanced:Boolean(entry.advanced),label:entry.label||player.participant};
+  }
+  if(mode==='individual'||mode==='pairs'){
+    const ranked=rankedPlace(entries,x=>x.score,target);
+    return{kind:mode,place:ranked?.place||null,score:entry.score??null,label:entry.label||player.participant};
+  }
+  return null;
+}
+
+async function playerHq(request,env,ctx){
+  if(request.method!=='GET')return json({error:'Method not allowed'},405);
+  const token=request.headers.get('x-player-nfc');
+  const player=await resolvePlayer(env,token);
+  if(!player)return json({error:'This NFC player card is invalid or inactive.'},401);
+
+  const [registrations,allEvents,cards,pairs]=await Promise.all([
+    select(env,'registrations',`select=event_id&participant_id=eq.${filter(player.id)}`),
+    select(env,'olympic_events','select=id,notion_page_id,event,event_key,event_number,division,divisions,format,scheduled_time,status,gold_points,gold_teams,silver_points,silver_teams,bronze_1_points,bronze_1_teams,bronze_2_points,bronze_2_teams&order=event_number.asc'),
+    select(env,'event_scorecards','select=event_id,format_key,state,updated_at'),
+    select(env,'event_pairs','select=id,event_id,pair_number,olympic_team,participant_1_id,participant_2_id'),
+  ]);
+
+  const registered=new Set(registrations.map(x=>String(x.event_id)));
+  const cardByEvent=new Map(cards.map(x=>[String(x.event_id),x]));
+  const pairIdsByEvent=new Map();
+  for(const pair of pairs){
+    if(String(pair.participant_1_id)!==String(player.id)&&String(pair.participant_2_id)!==String(player.id))continue;
+    const key=String(pair.event_id);
+    if(!pairIdsByEvent.has(key))pairIdsByEvent.set(key,new Set());
+    pairIdsByEvent.get(key).add(String(pair.id));
   }
 
-  if(request.method==='POST'){
-    let body=null;
-    try{body=await request.clone().json()}catch{}
-    const token=String(body?.nfcToken||'').trim();
-    if(!token)return app.fetch(request,env,ctx);
-    const player=await resolvePlayer(env,token);
-    if(!player)return json({error:'This NFC player card is invalid or inactive.'},401);
-    if(String(body?.participantId||'')!==String(player.notion_page_id||''))return json({error:'This NFC card can only update its assigned player.'},403);
-    touchToken(env,player,ctx);
-    return app.fetch(request,env,ctx);
-  }
+  const events=allEvents.filter(e=>registered.has(String(e.id))).map(e=>{
+    const eventId=String(e.id);
+    const personal=personalScore(cardByEvent.get(eventId),player,pairIdsByEvent.get(eventId)||new Set());
+    const team=teamResult(e,player.team);
+    const result=personal?.place?{place:personal.place,medal:personal.place===1?'🥇':personal.place===2?'🥈':personal.place===3?'🥉':personal.place===4?'🟤':'',label:`${personal.place}${personal.place===1?'st':personal.place===2?'nd':personal.place===3?'rd':'th'}`}:(team?{place:team.place,medal:team.medal,label:team.label}:null);
+    return{
+      id:e.notion_page_id||e.id,
+      eventKey:e.event_key||null,
+      number:e.event_number,
+      name:String(e.event||'').trim(),
+      format:e.format||null,
+      divisions:e.divisions||[],
+      scheduledTime:e.scheduled_time||null,
+      status:e.status||'Not Started',
+      result,
+      teamResult:team,
+      personal,
+    };
+  }).sort((a,b)=>{
+    const at=a.scheduledTime?new Date(a.scheduledTime).getTime():Infinity;
+    const bt=b.scheduledTime?new Date(b.scheduledTime).getTime():Infinity;
+    return at-bt||number(a.number)-number(b.number);
+  });
 
-  return app.fetch(request,env,ctx);
+  const medalCounts={gold:0,silver:0,bronze:0,copper:0};
+  for(const event of events){
+    const p=event.result?.place;
+    if(p===1)medalCounts.gold++;
+    else if(p===2)medalCounts.silver++;
+    else if(p===3)medalCounts.bronze++;
+    else if(p===4)medalCounts.copper++;
+  }
+  const completed=events.filter(e=>e.status==='Complete').length;
+  const teamPoints=events.reduce((sum,e)=>sum+number(e.teamResult?.points),0);
+  const nextEvent=events.find(e=>e.status!=='Complete')||null;
+  touchToken(env,player,ctx);
+
+  return json({
+    ok:true,
+    player:{id:player.notion_page_id,name:player.participant,team:player.team||null,divisions:player.divisions||[]},
+    summary:{registered:events.length,completed,podiums:medalCounts.gold+medalCounts.silver+medalCounts.bronze+medalCounts.copper,teamPoints,medals:medalCounts},
+    nextEvent,
+    events,
+    updatedAt:new Date().toISOString(),
+  });
 }
 
 async function ensureTokens(env,participants){
@@ -111,13 +197,13 @@ async function adminNfc(request,env){
   const origin=new URL(request.url).origin;
   const cards=participants.map(p=>{
     const row=tokenMap.get(p.id);
-    return {
+    return{
       participantId:p.notion_page_id,
       name:p.participant,
       team:p.team||null,
       active:Boolean(row?.active),
       lastUsedAt:row?.last_used_at||null,
-      url:row?.token?`${origin}/#nfc=${encodeURIComponent(row.token)}`:null,
+      url:row?.token?`${origin}/gameday-hq.html#nfc=${encodeURIComponent(row.token)}`:null,
     };
   });
   return json({ok:true,cards,count:cards.length});
@@ -128,7 +214,7 @@ export default{
     const path=new URL(request.url).pathname;
     try{
       if(path==='/api/admin/nfc-cards')return adminNfc(request,env);
-      if(path==='/api/registration')return nfcRegistration(request,env,ctx);
+      if(path==='/api/player-hq')return playerHq(request,env,ctx);
       return app.fetch(request,env,ctx);
     }catch(e){
       return json({error:String(e?.message||e)},502);
