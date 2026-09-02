@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "schafer-olympics",
   "compatibility_date": "2026-08-29",
-  "main": "./worker-egg-toss.js",
+  "main": "./worker-event-scorecards.js",
   "secrets": {
     "required": [
       "SUPABASE_URL",
