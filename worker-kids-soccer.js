@@ -1,4 +1,4 @@
-import app from './worker-event-scorecards.js';
+import app from './worker-cornhole-12.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 const base=e=>String(e.SUPABASE_URL||'').replace(/\/+$/,'').replace(/\/rest\/v1$/,'');
 async function sb(env,path,init={}){const r=await fetch(`${base(env)}/rest/v1/${path}`,{...init,headers:{apikey:env.SUPABASE_SECRET_KEY,'Content-Type':'application/json',...(init.headers||{})}});const t=await r.text();let d=null;try{d=t?JSON.parse(t):null}catch{d=t}if(!r.ok)throw new Error(typeof d==='string'?d:(d?.message||`Supabase ${r.status}`));return d}
