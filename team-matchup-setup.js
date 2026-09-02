@@ -3,9 +3,9 @@ const TEAMS=['Team Red','Team Blue','Team Green','Team Gold'],STORAGE_KEY='schaf
 const CONFIG={
   'kids-soccer':{combined:true,kids:true,title:'Kids Soccer'},
   'junior-basketball':{combined:true,title:'Junior Basketball'},
-  'nuke-em':{combined:false,title:'Nuke ’Em'},
-  'fill-the-water-bottle':{combined:false,title:'Fill the Water Bottle'},
-  'protect-the-balloon-baby':{combined:false,title:'Protect the Balloon Baby'},
+  'nuke-em':{combined:true,title:'Nuke ’Em'},
+  'fill-the-water-bottle':{combined:true,title:'Fill the Water Bottle'},
+  'protect-the-balloon-baby':{combined:true,title:'Protect the Balloon Baby'},
   'kids-dodgeball':{combined:true,title:'Kids Dodgeball'},
   'women-s-dodgeball':{combined:true,title:'Women’s Dodgeball'},
   'men-s-dodgeball':{combined:true,title:'Men’s Dodgeball'}
@@ -23,10 +23,11 @@ function renderSelectors(key,cfg,payload,message=''){
   const size=cfg.combined?2:1;let vals=[];
   if(payload.kind==='kids'){for(const s of payload.sides)vals.push(s.team_a||'',s.team_b||'');vals=vals.slice(0,4)}else vals=[...(payload.sides?.[0]||[]),...(payload.sides?.[1]||[])];
   while(vals.length<size*2)vals.push('');
+  vals=vals.slice(0,size*2);
   if(sum)sum.innerHTML=`<strong>${cfg.title}</strong> · matchup is controlled here in the Teams tab.`;
   host.innerHTML=`<div class="cornhole-seeding team-matchup-setup" data-event-key="${esc(key)}"><p class="section-kicker">Control View only</p><h3>${esc(cfg.title)} Team Matchup</h3><p class="team-editor-note">Choose the Olympic teams for each side here. The event page is scoring only.</p><div class="seed-grid">${[0,1].map(side=>`<div class="seed-row"><strong>Side ${side?'B':'A'}</strong><div class="event-pair">${Array.from({length:size},(_,j)=>{const idx=side*size+j;return `<select class="matchup-team-select" data-i="${idx}">${options(vals[idx])}</select>`}).join('<span>+</span>')}</div></div>`).join('')}</div><div class="seed-actions"><button id="matchup-random" class="refresh" type="button">🎲 Randomize</button><button id="matchup-save" class="save-score seed-save" type="button">Save Matchup</button><span id="matchup-message" class="team-editor-message">${esc(message)}</span></div></div>`;
   host.querySelectorAll('.matchup-team-select').forEach(s=>s.onchange=()=>{const m=host.querySelector('#matchup-message');if(m)m.textContent='Unsaved matchup changes'});
-  host.querySelector('#matchup-random').onclick=()=>{const x=[...TEAMS].sort(()=>Math.random()-.5);host.querySelectorAll('.matchup-team-select').forEach((s,i)=>s.value=x[i]||'');const m=host.querySelector('#matchup-message');if(m)m.textContent='🎲 Random matchup ready — press Save Matchup.'};
+  host.querySelector('#matchup-random').onclick=()=>{const x=[...TEAMS];for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[x[i],x[j]]=[x[j],x[i]]}host.querySelectorAll('.matchup-team-select').forEach((s,i)=>s.value=x[i]||'');const m=host.querySelector('#matchup-message');if(m)m.textContent='🎲 Random matchup ready — press Save Matchup.'};
   host.querySelector('#matchup-save').onclick=()=>save(key,cfg,payload);
 }
 async function save(key,cfg,payload){const vals=flatSelections(),size=cfg.combined?2:1,msg=document.querySelector('#matchup-message'),btn=document.querySelector('#matchup-save');if(vals.length!==size*2||vals.some(x=>!x)||new Set(vals).size!==vals.length){if(msg)msg.textContent='Choose each Olympic team only once.';return}if(!code()){if(msg)msg.textContent='Control View is locked.';return}btn.disabled=true;if(msg)msg.textContent='Saving…';try{
