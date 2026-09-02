@@ -73,7 +73,6 @@ function automaticAdvance(){
       ?'Top scorer plus all 3 shooters tied for second advanced automatically to Round 2.'
       :'Top 4 advanced automatically to Round 2.';
   }
-  saveNow();
 }
 function queueAdvance(delay=250){clearTimeout(advanceTimer);advanceTimer=setTimeout(automaticAdvance,delay)}
 function build(){
