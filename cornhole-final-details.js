@@ -32,11 +32,19 @@
         if(!Number.isFinite(seed))return;
         const info=seeds.get(seed);
         if(!info)return;
-        strong.textContent=info.players||`Seed ${seed}`;
+
+        const desiredStrong=info.players||`Seed ${seed}`;
+        if(strong.textContent!==desiredStrong)strong.textContent=desiredStrong;
+
         let meta=small;
-        if(!meta){meta=document.createElement('small');strong.after(meta)}
-        meta.className='cornhole-final-meta';
-        meta.innerHTML=`${info.olympicTeam?`<span class="cornhole-final-team">${info.olympicTeam}</span>`:''}<span class="cornhole-final-seed">Seed ${seed}</span>`;
+        if(!meta){
+          meta=document.createElement('small');
+          strong.after(meta);
+        }
+        if(meta.className!=='cornhole-final-meta')meta.className='cornhole-final-meta';
+
+        const desiredHtml=`${info.olympicTeam?`<span class="cornhole-final-team">${info.olympicTeam}</span>`:''}<span class="cornhole-final-seed">Seed ${seed}</span>`;
+        if(meta.innerHTML!==desiredHtml)meta.innerHTML=desiredHtml;
       });
     }finally{working=false}
   }
@@ -52,7 +60,16 @@
   `;
   document.head.appendChild(style);
 
-  new MutationObserver(()=>queueMicrotask(enhance)).observe(document.documentElement,{childList:true,subtree:true});
+  let queued=false;
+  const observer=new MutationObserver(()=>{
+    if(queued||working)return;
+    queued=true;
+    requestAnimationFrame(()=>{
+      queued=false;
+      enhance();
+    });
+  });
+  observer.observe(document.documentElement,{childList:true,subtree:true});
   document.addEventListener('DOMContentLoaded',enhance);
   enhance();
 })();
