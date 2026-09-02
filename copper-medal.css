@@ -1,0 +1,1 @@
+.medal-row{grid-template-columns:42px minmax(130px,1.4fr) repeat(4,minmax(55px,.45fr)) minmax(65px,.5fr)}@media(max-width:560px){.medal-row{min-width:600px}}
