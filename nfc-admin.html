@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="theme-color" content="#eaf5ff"/>
+  <title>Schafer Olympics | NFC Player Cards</title>
+  <meta name="robots" content="noindex,nofollow"/>
+  <link rel="stylesheet" href="/styles.css"/>
+  <link rel="stylesheet" href="/nfc-admin.css"/>
+</head>
+<body>
+  <main class="nfc-admin">
+    <div class="nfc-admin__wrap">
+      <p class="eyebrow">🏅 Schafer Olympics 2026</p>
+      <h1>NFC Player Cards</h1>
+      <p class="nfc-admin__intro">Load the player links, then write each URL to that player's NFC card as a website/URL record.</p>
+
+      <section class="panel nfc-login">
+        <label class="field field--wide"><span>Admin code</span><input id="nfc-admin-code" type="password" autocomplete="current-password" inputmode="numeric"/></label>
+        <button id="load-nfc-cards" class="save-score" type="button">Load Player Links</button>
+        <span id="nfc-admin-message" class="admin-message" aria-live="polite"></span>
+      </section>
+
+      <section id="nfc-card-list" class="nfc-card-list" aria-live="polite">
+        <p class="panel-note">Enter the admin code to load NFC links.</p>
+      </section>
+    </div>
+  </main>
+  <script src="/no-zoom.js" defer></script>
+  <script src="/nfc-admin.js" defer></script>
+</body>
+</html>
