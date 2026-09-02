@@ -14,8 +14,13 @@ export default {
         data.rows=data.rows.map(row=>{
           const p={...(row.properties||{})};
           const bronze1=Array.isArray(p['Bronze 1 Team'])?p['Bronze 1 Team']:(p['Bronze 1 Team']?[p['Bronze 1 Team']]:[]);
+          const copper=Array.isArray(p['Bronze 2 Team'])?p['Bronze 2 Team']:(p['Bronze 2 Team']?[p['Bronze 2 Team']]:[]);
           p['🥉 Team']=bronze1;
           p['🥉 Bronze Points']=Number(p['Bronze 1 Points']||0);
+          p['Copper Team']=copper;
+          p['🟤 Team']=copper;
+          p['Copper Points']=Number(p['Bronze 2 Points']||0);
+          p['🟤 Copper Points']=Number(p['Bronze 2 Points']||0);
           return {...row,properties:p};
         });
       }
