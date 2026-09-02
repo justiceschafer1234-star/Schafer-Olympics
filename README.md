@@ -32,6 +32,16 @@ Event-specific scorecards and tournament controllers save their operational stat
 
 Existing score-entry autosave behavior is intentionally preserved.
 
+## NFC player passes
+
+Each participant can have one active random token in `player_nfc_tokens`. The physical NFC card stores only a site URL such as `https://example.com/#nfc=<random-token>`; it never stores a Supabase credential.
+
+On an NFC visit, browser JavaScript passes the token to the Worker. The Worker resolves the token server-side, limits the registration response to the assigned participant, and rejects NFC-mode registration writes for any other participant.
+
+`/nfc-admin.html` is the admin-code-protected card-management page. It lists the current per-player NFC URLs and can rotate a player's link if a card is lost or needs to be reissued. New participants receive a token automatically when the admin card list is loaded.
+
+The ordinary name-picker registration flow remains available when the site is opened without an NFC token.
+
 ## Required Cloudflare secrets
 
 - `SUPABASE_URL`
@@ -54,6 +64,7 @@ Primary Supabase tables include:
 - `olympic_events`
 - `participants`
 - `registrations`
+- `player_nfc_tokens`
 - `event_participants`
 - `event_pairs`
 - `event_scorecards`
@@ -70,7 +81,7 @@ SQL/schema and migration utilities are kept under `supabase/`.
 
 Cloudflare Worker configuration is in `wrangler.jsonc`. Static assets are served from the repository root and `/api/*` requests run through the Worker first.
 
-The configured Worker entry point is `worker-kids-soccer.js`, which delegates through the composed Worker modules for the remaining API routes.
+The configured Worker entry point is `worker-nfc.js`. It handles the NFC routes and delegates all existing application traffic to `worker-kids-soccer.js`, which continues through the composed Worker modules for the remaining API routes.
 
 ## Reliability notes
 
@@ -78,4 +89,5 @@ The configured Worker entry point is `worker-kids-soccer.js`, which delegates th
 - Production reads/writes use Supabase rather than Notion.
 - Notion backup is optional and asynchronous.
 - Row-level security is enabled on the Supabase public tables; server-side Worker access uses the secret Supabase credential.
+- NFC token rows are not granted to anonymous or authenticated browser roles.
 - Operational datasets are small and indexed for the current event workload.
