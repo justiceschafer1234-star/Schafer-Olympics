@@ -1,8 +1,8 @@
 (()=>{
 const $=s=>document.querySelector(s);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const control=new URLSearchParams(location.search).get('control')==='1';
-const seedList=$('#seed-list'),wb=$('#winners-bracket'),lb=$('#losers-bracket'),finals=$('#finals-grid');
+const seedList=$('#seed-list'),wb=$('#winners-bracket'),lb=$('#losers-bracket'),finals=$('#finals-grid'),leaderboard=$('#final-leaderboard'),leaderboardStatus=$('#leaderboard-status');
 let matches=[],teams=[];
 const teamBySeed=new Map();
 const roundNames={
@@ -13,8 +13,9 @@ const roundNames={
 function seedNumber(label){const m=String(label||'').match(/^Seed\s+(\d+)$/i);return m?Number(m[1]):null}
 function canonical(label,fallback=''){
   const seed=seedNumber(label),t=seed?teamBySeed.get(seed):null;
-  return t?{label:`Seed ${seed}`,players:t.players,olympicTeam:t.olympicTeam}:{label:String(label||''),players:String(fallback||''),olympicTeam:''};
+  return t?{label:`Seed ${seed}`,seed,players:t.players,olympicTeam:t.olympicTeam}:{label:String(label||''),seed:null,players:String(fallback||''),olympicTeam:''};
 }
+function matchByCode(code){return matches.find(m=>m.properties?.Match===code)?.properties||null}
 function inbound(code){
   const out=[];
   for(const m of matches){const p=m.properties||{};if(p['Winner To']===code)out.push(`Winner of ${p.Match}`);if(p['Loser To']===code)out.push(`Loser of ${p.Match}`)}
@@ -62,17 +63,59 @@ function renderStatus(){
   if(!teams.some(t=>t.seed!=null)){el.textContent='Waiting for seeding';return}
   el.textContent=`${complete} complete · ${ready} ready`;
 }
+function recordFor(label){
+  let wins=0,losses=0;
+  for(const m of matches){
+    const p=m.properties||{};
+    if(p.Status!=='Complete'||!p['Team A']||!p['Team B'])continue;
+    if(p.Winner===label)wins++;
+    if(p.Loser===label)losses++;
+  }
+  return `${wins}–${losses}`;
+}
+function finishRow(finish,label){
+  if(!label)return'';
+  const c=canonical(label),medal=/^(🥇|🥈|🥉)/.test(finish);
+  return `<div class="leaderboard-row${medal?' is-medal':''}"><span class="leaderboard-finish">${esc(finish)}</span><span class="leaderboard-pair"><strong>${esc(c.players||c.label)}</strong><small>${esc(c.label)}</small></span><span class="leaderboard-team">${esc(c.olympicTeam||'—')}</span><span class="leaderboard-record">${esc(recordFor(label))}</span><span class="leaderboard-seed">${c.seed??'—'}</span></div>`;
+}
+function renderLeaderboard(){
+  if(!leaderboard||!leaderboardStatus)return;
+  const gf1=matchByCode('GF1'),gf2=matchByCode('GF2'),w7=matchByCode('W7');
+  let champion='',runnerUp='';
+  if(gf2?.Status==='Complete'&&gf2.Winner){champion=gf2.Winner;runnerUp=gf2.Loser}
+  else if(gf1?.Status==='Complete'&&gf1.Winner&&w7?.Winner&&gf1.Winner===w7.Winner){champion=gf1.Winner;runnerUp=gf1.Loser}
+  if(!champion){leaderboardStatus.textContent='Waiting for finish';leaderboard.innerHTML='<div class="loading">Final standings will appear when the tournament is complete.</div>';return}
+
+  const rows=[
+    ['🥇 1st',champion],
+    ['🥈 2nd',runnerUp],
+    ['🥉 3rd',matchByCode('L8')?.Loser],
+    ['4th',matchByCode('L7')?.Loser],
+    ['T-5th',matchByCode('L5')?.Loser],
+    ['T-5th',matchByCode('L6')?.Loser],
+    ['T-7th',matchByCode('L3')?.Loser],
+    ['T-7th',matchByCode('L4')?.Loser],
+    ['T-9th',matchByCode('L1')?.Loser],
+    ['T-9th',matchByCode('L2')?.Loser]
+  ].filter(x=>x[1]);
+  const orderValue=x=>{const n=Number(String(x[0]).match(/\d+/)?.[0]||99);return n};
+  rows.sort((a,b)=>orderValue(a)-orderValue(b)||(seedNumber(a[1])??99)-(seedNumber(b[1])??99));
+  leaderboardStatus.textContent='Final';
+  leaderboard.innerHTML='<div class="leaderboard-row is-header"><span>Finish</span><span>Pair</span><span>Olympic Team</span><span>Record</span><span>Seed</span></div>'+rows.map(([finish,label])=>finishRow(finish,label)).join('');
+}
 function render(){
   renderSeeds();renderStatus();
   if(!teams.length){
     wb.innerHTML='<div class="loading">0</div>';
     lb.innerHTML='<div class="loading">0</div>';
     finals.innerHTML='<div class="loading">0</div>';
+    renderLeaderboard();
     return;
   }
   renderRounds(wb,'Winners');renderRounds(lb,'Losers');
   const fs=matches.filter(m=>m.properties?.Bracket==='Finals').sort((a,b)=>Number(a.properties?.Round)-Number(b.properties?.Round));
   finals.innerHTML=fs.map(m=>`<section class="final-card"><h4>${esc(roundNames.Finals[m.properties?.Round]||m.properties?.Match)}</h4>${card(m)}</section>`).join('')||'<div class="loading">No championship matches found.</div>';
+  renderLeaderboard();
   bindScoring();
 }
 function openScore(id){
@@ -127,7 +170,7 @@ async function load(){
     const [td,md]=await Promise.all([tr.json(),mr.json()]);
     if(!tr.ok)throw new Error(td.error||'Could not load Cornhole teams.');if(!mr.ok)throw new Error(md.error||'Could not load Cornhole bracket.');
     teams=td.teams||[];teamBySeed.clear();teams.filter(t=>t.seed!=null).forEach(t=>teamBySeed.set(Number(t.seed),t));matches=md.matches||[];render();
-  }catch(err){seedList.innerHTML=`<div class="loading error">${esc(err.message)}</div>`;wb.innerHTML=`<div class="loading error">${esc(err.message)}</div>`;lb.innerHTML='';finals.innerHTML='';$('#seeded-count').textContent='0';$('#pair-count').textContent='0';$('#bracket-status').textContent='Load error'}
+  }catch(err){seedList.innerHTML=`<div class="loading error">${esc(err.message)}</div>`;wb.innerHTML=`<div class="loading error">${esc(err.message)}</div>`;lb.innerHTML='';finals.innerHTML='';if(leaderboard)leaderboard.innerHTML='';$('#seeded-count').textContent='0';$('#pair-count').textContent='0';$('#bracket-status').textContent='Load error';if(leaderboardStatus)leaderboardStatus.textContent='Load error'}
 }
 $('#score-sheet-form').addEventListener('submit',saveScore);document.querySelectorAll('[data-close-score]').forEach(x=>x.addEventListener('click',closeScore));document.addEventListener('keydown',e=>{if(e.key==='Escape')closeScore()});
 load();
