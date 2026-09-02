@@ -9,11 +9,23 @@
   const filter=document.querySelector('#nfc-player-filter');
   const visibleCount=document.querySelector('#nfc-visible-count');
   const visibleLabel=document.querySelector('#nfc-visible-label');
+  const support=document.querySelector('#nfc-write-support');
   if(!code||!load||!message||!list)return;
 
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const canWriteNfc=window.isSecureContext&&'NDEFReader' in window;
   let cards=[];
   let toastTimer=null;
+  let writing=false;
+
+  document.body.classList.add(canWriteNfc?'web-nfc-supported':'web-nfc-unsupported');
+  if(support){
+    support.hidden=false;
+    support.className=`nfc-write-support ${canWriteNfc?'is-supported':'is-fallback'}`;
+    support.textContent=canWriteNfc
+      ?'Direct card writing is available on this device.'
+      :'Direct browser writing is not available on this device. Use Copy Link with your NFC writing app.';
+  }
 
   const savedCode=sessionStorage.getItem('schaferOlympicsNfcAdminCode')||sessionStorage.getItem('schaferOlympicsControlCode')||'';
   if(savedCode)code.value=savedCode;
@@ -79,6 +91,7 @@
       </div>
       <div class="nfc-card__meta ${used?'is-used':''}">${used?'✓':'○'} ${esc(formatUsed(card.lastUsedAt))}</div>
       <div class="nfc-card__actions">
+        <button type="button" class="nfc-write-button" data-action="write">Write Card</button>
         <button type="button" class="nfc-copy-button" data-action="copy">Copy Link</button>
         <a class="nfc-open-button" href="${esc(card.url||'#')}" target="_blank" rel="noopener">Open Player Page</a>
       </div>
@@ -141,6 +154,45 @@
     }
   }
 
+  async function writeCard(card,button){
+    if(!canWriteNfc){
+      showToast('Direct NFC writing is not available on this device');
+      return;
+    }
+    if(writing)return;
+    writing=true;
+    const original=button.textContent;
+    button.disabled=true;
+    button.classList.add('is-writing');
+    button.textContent='Tap NFC Card…';
+    message.textContent=`Hold ${card.name}'s NFC card against the phone…`;
+    try{
+      const ndef=new NDEFReader();
+      await ndef.write({records:[{recordType:'url',data:String(card.url||'')}]});
+      button.textContent='Written ✓';
+      button.classList.remove('is-writing');
+      message.textContent=`✓ ${card.name}'s player link was written to the NFC card.`;
+      showToast(`${card.name}'s card written`);
+      if(navigator.vibrate)navigator.vibrate([60,40,60]);
+      setTimeout(()=>{button.textContent=original},1800);
+    }catch(e){
+      const name=String(e?.name||'');
+      const text=name==='NotAllowedError'
+        ?'NFC permission was not granted. Tap Write Card and allow NFC access.'
+        :name==='NotSupportedError'
+          ?'This NFC tag or device is not supported for browser writing.'
+          :`Could not write the card${e?.message?`: ${e.message}`:'.'}`;
+      message.textContent=text;
+      button.textContent='Try Again';
+      button.classList.remove('is-writing');
+      showToast('Card was not written');
+      setTimeout(()=>{button.textContent=original},2200);
+    }finally{
+      writing=false;
+      button.disabled=false;
+    }
+  }
+
   load.addEventListener('click',loadPlayers);
   code.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();loadPlayers()}});
   search?.addEventListener('input',render);
@@ -154,6 +206,11 @@
     const participantId=cardEl?.dataset.player;
     const card=cards.find(x=>String(x.participantId)===String(participantId));
     if(!card)return;
+
+    if(button.dataset.action==='write'){
+      await writeCard(card,button);
+      return;
+    }
 
     if(button.dataset.action==='copy'){
       const original=button.textContent;
