@@ -17,6 +17,16 @@ function scheduleSave(delay=700){
   },delay);
 }
 function roundOneCards(){return [...scorecard.querySelectorAll('.shootout-round:first-child .shootout-card:not(.is-placeholder)')]}
+function chooseFinalists(ranked){
+  const leaderScore=ranked[0]?.score;
+  const leaders=ranked.filter(x=>x.score===leaderScore);
+  const secondScore=ranked.find(x=>x.score<leaderScore)?.score;
+  const secondPlaceTies=secondScore==null?[]:ranked.filter(x=>x.score===secondScore);
+  if(leaders.length===1&&secondPlaceTies.length===3){
+    return{chosen:new Set([leaders[0],...secondPlaceTies].map(x=>x.index)),specialTie:true};
+  }
+  return{chosen:new Set(ranked.slice(0,FINALISTS).map(x=>x.index)),specialTie:false};
+}
 function automaticAdvance(){
   clearTimeout(advanceTimer);
   const cards=roundOneCards();
@@ -36,7 +46,8 @@ function automaticAdvance(){
     return;
   }
   const ranked=[...scored].sort((a,b)=>b.score-a.score||a.index-b.index);
-  const chosen=new Set(ranked.slice(0,FINALISTS).map(x=>x.index));
+  const selection=chooseFinalists(ranked);
+  const chosen=selection.chosen;
   const mismatch=scored.find(x=>x.checkbox&&x.checkbox.checked!==chosen.has(x.index));
   if(mismatch){
     autoAdvancing=true;
@@ -48,9 +59,9 @@ function automaticAdvance(){
   autoAdvancing=false;
   const note=scorecard.querySelector('.shootout-limit');
   if(note){
-    const fourth=ranked[3]?.score;
-    const tiedAtOrAbove=ranked.filter(x=>x.score>=fourth);
-    note.textContent=tiedAtOrAbove.length===FINALISTS?'Top 4 advanced automatically to Round 2.':'Top 4 advanced automatically to Round 2.';
+    note.textContent=selection.specialTie
+      ?'Top scorer plus all 3 shooters tied for second advanced automatically to Round 2.'
+      :'Top 4 advanced automatically to Round 2.';
   }
   scheduleSave(300);
 }
