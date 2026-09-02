@@ -53,7 +53,7 @@ create table if not exists public.event_pairs (
 
 alter table public.event_pairs add column if not exists seed integer;
 alter table public.event_pairs drop constraint if exists event_pairs_seed_check;
-alter table public.event_pairs add constraint event_pairs_seed_check check (seed is null or seed between 1 and 10);
+alter table public.event_pairs add constraint event_pairs_seed_check check (seed is null or seed between 1 and 12);
 create unique index if not exists event_pairs_event_seed_idx on public.event_pairs(event_id, seed) where seed is not null;
 create index if not exists event_pairs_event_idx on public.event_pairs(event_id);
 create index if not exists event_pairs_team_idx on public.event_pairs(event_id, olympic_team);
