@@ -6,7 +6,7 @@ const RULES={
   'kids-soccer':{mode:'game',title:'Kids Soccer',combined:true,places:2},
   'junior-basketball':{mode:'game',title:'Junior Basketball',combined:true,places:2},
   'women-s-three-point-contest':{mode:'two-stage',title:'Women’s Three-Point Contest',finalists:4,places:3},
-  'men-s-three-point-contest':{mode:'two-stage',title:'Men’s Three-Point Contest',finalists:6,places:3},
+  'men-s-three-point-contest':{mode:'two-stage',title:'Men’s Three-Point Contest',finalists:4,places:3},
   'speed-grab':{mode:'bracket',title:'Speed Grab',places:3},
   'nuke-em':{mode:'game',title:'Nuke ’Em',combined:false,places:2},
   'speed-volleyball-volleyball':{mode:'round-total',title:'Speed Volleyball',minRounds:2,maxRounds:4,places:4},
