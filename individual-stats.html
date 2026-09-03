@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="theme-color" content="#eef5fb"/>
+  <title>Schafer Olympics | MVP Stats</title>
+  <meta name="description" content="Private team-by-team individual MVP stat entry for Schafer Olympics."/>
+  <link rel="stylesheet" href="/styles.css"/>
+  <link rel="stylesheet" href="/individual-stats.css?v=1"/>
+</head>
+<body class="mvp-stats-page">
+  <header class="mvp-hero">
+    <div class="mvp-hero__inner">
+      <a class="mvp-back" href="/gameday-hq.html">← Game Day HQ</a>
+      <p class="eyebrow">🏅 Schafer Olympics 2026</p>
+      <h1>Individual MVP Stats</h1>
+      <p id="mvp-hero-subtitle">Private scorekeeper view. Each editor works on one Olympic team only.</p>
+    </div>
+  </header>
+
+  <main class="mvp-shell">
+    <section id="team-launcher" class="mvp-panel team-launcher" hidden>
+      <p class="section-kicker">Choose a scorekeeper view</p>
+      <h2>Which team are you tracking?</h2>
+      <p>Open one view per stat editor. Each view only loads players from that Olympic team.</p>
+      <div class="team-launcher__grid">
+        <a class="team-launch team-red" href="/individual-stats.html?team=red"><span>🔴</span><strong>Team Red</strong><small>Open Red stats</small></a>
+        <a class="team-launch team-blue" href="/individual-stats.html?team=blue"><span>🔵</span><strong>Team Blue</strong><small>Open Blue stats</small></a>
+        <a class="team-launch team-green" href="/individual-stats.html?team=green"><span>🟢</span><strong>Team Green</strong><small>Open Green stats</small></a>
+        <a class="team-launch team-gold" href="/individual-stats.html?team=gold"><span>🟡</span><strong>Team Gold</strong><small>Open Gold stats</small></a>
+      </div>
+    </section>
+
+    <section id="unlock-panel" class="mvp-panel unlock-panel" hidden>
+      <p class="section-kicker">Private control</p>
+      <h2>Unlock MVP Stats</h2>
+      <p>This uses the same private control code as Game Day HQ.</p>
+      <form id="unlock-form" class="unlock-form">
+        <label><span>Control code</span><input id="control-code" type="password" inputmode="numeric" autocomplete="off" required/></label>
+        <button type="submit">Unlock Stats</button>
+      </form>
+      <p id="unlock-message" class="mvp-message" aria-live="polite"></p>
+    </section>
+
+    <div id="stats-app" hidden>
+      <section class="mvp-panel team-banner">
+        <div>
+          <p class="section-kicker">Team-only editor</p>
+          <h2 id="team-title">Team</h2>
+          <p id="team-note">Only registered players from this team will appear.</p>
+        </div>
+        <div class="team-banner__actions">
+          <span id="team-pill" class="team-pill"></span>
+          <a href="/individual-stats.html" class="change-view">Change team view</a>
+        </div>
+      </section>
+
+      <section class="event-toolbar" aria-label="MVP event navigation">
+        <div class="event-toolbar__row">
+          <button id="previous-event" type="button" class="event-step" aria-label="Previous event">←</button>
+          <label class="event-picker"><span>Event</span><select id="event-select"><option value="">Loading events…</option></select></label>
+          <button id="next-event" type="button" class="event-step" aria-label="Next event">→</button>
+        </div>
+        <div class="event-toolbar__meta">
+          <span id="event-mode">—</span>
+          <strong id="event-max">—</strong>
+          <button id="refresh-event" type="button" class="refresh-event">↻ Refresh</button>
+        </div>
+      </section>
+
+      <section id="event-summary" class="mvp-panel event-summary">
+        <div>
+          <p class="section-kicker">Selected event</p>
+          <h2 id="event-title">Choose an event</h2>
+          <p id="event-description">Stats and MVP values will appear here.</p>
+        </div>
+        <div class="event-summary__score">
+          <span>Maximum MVP</span>
+          <strong id="event-max-large">—</strong>
+        </div>
+      </section>
+
+      <div id="save-strip" class="save-strip" aria-live="polite">Ready</div>
+      <section id="players" class="player-stat-list" aria-live="polite"></section>
+    </div>
+  </main>
+
+  <script src="/no-zoom.js" defer></script>
+  <script src="/individual-stats.js?v=1" defer></script>
+</body>
+</html>
