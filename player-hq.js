@@ -17,7 +17,7 @@
   if(!document.querySelector('link[data-player-hq-style]')){
     const link=document.createElement('link');
     link.rel='stylesheet';
-    link.href='/player-hq.css?v=2';
+    link.href='/player-hq.css?v=3';
     link.dataset.playerHqStyle='1';
     document.head.appendChild(link);
   }
@@ -54,11 +54,8 @@
       time:d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}),
     };
   };
-  const fmtTime=value=>{
-    const x=dateParts(value);
-    return x.time?`${x.date} · ${x.time}`:x.date;
-  };
   const statusClass=s=>String(s||'Not Started').toLowerCase().replaceAll(' ','-');
+  const ordinal=n=>`${n}${n===1?'st':n===2?'nd':n===3?'rd':'th'}`;
 
   function activate(){
     document.querySelectorAll('.tab').forEach(x=>x.classList.remove('is-active'));
@@ -132,11 +129,6 @@
     panel.hidden=true;
   },true);
 
-  function resultMarkup(event){
-    if(!event.result)return '<span class="player-result pending">Pending</span>';
-    return `<span class="player-result">${esc(event.result.medal||'')} ${esc(event.result.label||'Placed')}</span>`;
-  }
-
   function personalDetail(event){
     const p=event.personal;
     if(!p)return '';
@@ -148,19 +140,65 @@
       return bits.join(' · ');
     }
     if(p.kind==='individual'||p.kind==='pairs')return p.score==null?'':`Score: ${fmtNumber(p.score)}`;
-    if(p.kind==='bracket')return p.place?`Finished ${p.place}${p.place===1?'st':p.place===2?'nd':p.place===3?'rd':'th'}`:'Bracket in progress';
+    if(p.kind==='bracket')return p.place?`Finished ${ordinal(Number(p.place))}`:'Bracket in progress';
     return '';
   }
 
-  function scheduleRow(event){
+  function eventResultMarkup(event){
+    const personal=event.personal;
+    const team=event.teamResult;
+    const detail=personalDetail(event);
+    let main='Pending';
+    let sub='Your result will appear here when it is recorded.';
+    let resultClass='is-pending';
+
+    if(personal?.place){
+      const medal=event.result?.medal||'';
+      main=`${medal} ${ordinal(Number(personal.place))}`.trim();
+      sub=detail||'Individual result recorded';
+      resultClass='is-complete';
+    }else if(personal){
+      if(event.status==='Complete'){
+        main='Complete';
+        sub=detail||'Individual result recorded';
+        resultClass='is-complete';
+      }else if(detail){
+        main='In progress';
+        sub=detail;
+        resultClass='is-live';
+      }
+    }else if(team){
+      main=`${team.medal||''} ${team.label||ordinal(Number(team.place))}`.trim();
+      sub=`Team result${Number(team.points||0)?` · +${fmtNumber(team.points)} team pts`:''}`;
+      resultClass='is-complete';
+    }
+
+    return `<div class="player-event-result ${resultClass}">
+      <span>YOUR RESULT</span>
+      <strong>${esc(main)}</strong>
+      <small>${esc(sub)}</small>
+    </div>`;
+  }
+
+  function scheduleCard(event,isNext){
     const when=dateParts(event.scheduledTime);
-    return `<article class="player-schedule-row">
-      <div class="player-schedule-top">
-        <div class="player-schedule-time"><strong>${esc(when.time||when.date)}</strong>${when.time?`<span>${esc(when.date)}</span>`:''}</div>
-        <span class="status-badge ${statusClass(event.status)}">${esc(event.status)}</span>
+    return `<article class="player-event-card${isNext?' is-next':''}">
+      <div class="player-event-card__top">
+        <div class="player-event-time">
+          <strong>${esc(when.time||when.date)}</strong>
+          ${when.time?`<span>${esc(when.date)}</span>`:''}
+        </div>
+        <div class="player-event-badges">
+          ${isNext?'<span class="player-next-badge">NEXT</span>':''}
+          <span class="status-badge ${statusClass(event.status)}">${esc(event.status)}</span>
+        </div>
       </div>
-      <div class="player-schedule-main"><strong>#${esc(event.number??'–')} ${esc(event.name)}</strong><span>${esc(event.format||'Event')}</span></div>
-      <div class="player-schedule-bottom">${resultMarkup(event)}</div>
+      <div class="player-event-title">
+        <span>Event ${esc(event.number??'–')}</span>
+        <strong>${esc(event.name)}</strong>
+        <small>${esc(event.format||'Event')}</small>
+      </div>
+      ${eventResultMarkup(event)}
     </article>`;
   }
 
@@ -170,7 +208,6 @@
     const events=data.events||[];
     const next=data.nextEvent;
     const medals=summary.medals||{};
-    const nextWhen=next?dateParts(next.scheduledTime):null;
 
     panel.innerHTML=`
       <section class="player-hq-hero">
@@ -179,45 +216,33 @@
           <h2>${esc(player.name||'Player')}</h2>
           <span class="player-team-pill">${esc(player.team||'Team not assigned yet')}</span>
         </div>
-        <div class="player-hq-medals" aria-label="Podium finishes">
-          <span><b>🥇</b>${Number(medals.gold||0)}</span><span><b>🥈</b>${Number(medals.silver||0)}</span><span><b>🥉</b>${Number(medals.bronze||0)}</span><span><b>🟤</b>${Number(medals.copper||0)}</span>
-        </div>
       </section>
-
-      <section class="player-next-event">
-        <div class="player-next-label">NEXT UP</div>
-        ${next?`<div class="player-next-event__body">
-          <div class="player-next-time"><strong>${esc(nextWhen?.time||nextWhen?.date||'Time TBD')}</strong>${nextWhen?.time?`<span>${esc(nextWhen.date)}</span>`:''}</div>
-          <div class="player-next-main"><span>Event ${esc(next.number??'–')}</span><strong>${esc(next.name)}</strong></div>
-          <span class="status-badge ${statusClass(next.status)}">${esc(next.status)}</span>
-        </div>`:'<p class="player-empty">No remaining registered events.</p>'}
-      </section>
-
-      <div class="player-summary-grid">
-        <article class="player-summary-card"><strong>${Number(summary.registered||0)}</strong><span>Events</span></article>
-        <article class="player-summary-card"><strong>${Number(summary.completed||0)}</strong><span>Done</span></article>
-        <article class="player-summary-card"><strong>${Number(summary.podiums||0)}</strong><span>Podiums</span></article>
-        <article class="player-summary-card"><strong>${fmtNumber(summary.teamPoints||0)}</strong><span>Team pts</span></article>
-      </div>
 
       <section class="panel player-schedule-panel">
-        <div class="player-section-head"><div><p class="section-kicker">Only my events</p><h2>My Schedule</h2></div><strong>${events.length}</strong></div>
+        <div class="player-section-head">
+          <div><p class="section-kicker">My events & results</p><h2>My Schedule</h2></div>
+          <strong>${events.length}</strong>
+        </div>
         <div class="player-schedule-list">
-          ${events.length?events.map(scheduleRow).join(''):'<p class="player-empty">You are not currently registered for any events.</p>'}
+          ${events.length?events.map(event=>scheduleCard(event,Boolean(next)&&String(event.id)===String(next.id))).join(''):'<p class="player-empty">You are not currently registered for any events.</p>'}
         </div>
       </section>
 
-      <section class="panel player-stats-panel">
-        <div class="player-section-head"><div><p class="section-kicker">Results & scores</p><h2>My Stats</h2></div></div>
-        <div class="player-event-stats">
-          ${events.length?events.map(event=>{
-            const detail=personalDetail(event);
-            const teamPoints=Number(event.teamResult?.points||0);
-            return `<article class="player-stat-row">
-              <div class="player-stat-head"><div><span>Event ${esc(event.number??'–')}</span><strong>${esc(event.name)}</strong></div>${resultMarkup(event)}</div>
-              <div class="player-stat-meta"><span>${esc(event.status)}</span>${detail?`<span>${esc(detail)}</span>`:''}${teamPoints?`<span>+${fmtNumber(teamPoints)} team pts</span>`:''}</div>
-            </article>`;
-          }).join(''):'<p class="player-empty">Stats will appear here once you are registered for events.</p>'}
+      <section class="panel player-summary-section">
+        <div class="player-section-head">
+          <div><p class="section-kicker">At a glance</p><h2>Summary Statistics</h2></div>
+        </div>
+        <div class="player-summary-grid">
+          <article class="player-summary-card"><strong>${Number(summary.registered||0)}</strong><span>Events entered</span></article>
+          <article class="player-summary-card"><strong>${Number(summary.completed||0)}</strong><span>Completed</span></article>
+          <article class="player-summary-card"><strong>${Number(summary.podiums||0)}</strong><span>Podium finishes</span></article>
+          <article class="player-summary-card"><strong>${fmtNumber(summary.teamPoints||0)}</strong><span>Team points</span></article>
+        </div>
+        <div class="player-medal-summary" aria-label="Medal summary">
+          <div><span>🥇</span><strong>${Number(medals.gold||0)}</strong><small>Gold</small></div>
+          <div><span>🥈</span><strong>${Number(medals.silver||0)}</strong><small>Silver</small></div>
+          <div><span>🥉</span><strong>${Number(medals.bronze||0)}</strong><small>Bronze</small></div>
+          <div><span>🟤</span><strong>${Number(medals.copper||0)}</strong><small>Copper</small></div>
         </div>
       </section>`;
   }
