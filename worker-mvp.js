@@ -1,5 +1,5 @@
 import app from './worker-nfc.js';
-import {adminMvpStats,getPlayerMvp} from './worker-mvp-stats-lib.js';
+import {adminMvpStats,getPlayerMvp,loadMvpSnapshot} from './worker-mvp-stats-lib.js';
 
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 
@@ -8,7 +8,10 @@ async function playerHqWithMvp(request,env,ctx){
   if(!response.ok)return response;
   let data;try{data=await response.json()}catch{return response}
   if(!data?.ok||!data?.player?.id)return json(data,response.status);
-  const mvp=await getPlayerMvp(env,data.player.id);
+  const snapshot=await loadMvpSnapshot(env);
+  const person=snapshot.participants.find(p=>String(p.notion_page_id||'')===String(data.player.id)||String(p.id)===String(data.player.id));
+  if(!person)return json(data,response.status);
+  const mvp=await getPlayerMvp(env,person.id);
   data.summary={...(data.summary||{}),mvpPoints:mvp.totalPoints};
   const byKey=new Map((mvp.events||[]).map(x=>[String(x.eventKey),x]));
   data.events=(data.events||[]).map(event=>({...event,mvp:byKey.get(String(event.eventKey))||null}));
