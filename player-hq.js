@@ -1,7 +1,12 @@
 (()=>{
   const hash=new URLSearchParams(String(location.hash||'').replace(/^#/,''));
-  const token=String(hash.get('nfc')||'').trim();
+  let token=String(hash.get('nfc')||'').trim();
   if(!token)return;
+
+  // Keep the NFC credential out of the address bar and this browser-history entry.
+  try{
+    history.replaceState(history.state,document.title,`${location.pathname}${location.search}`);
+  }catch{}
 
   const nav=document.querySelector('.tabs');
   const shell=document.querySelector('.shell');
@@ -32,6 +37,12 @@
   const updated=document.querySelector('#updated-at');
   shell.insertBefore(panel,updated||null);
 
+  const IDLE_TIMEOUT_MS=10*60*1000;
+  const activityEvents=['pointerdown','touchstart','keydown','scroll'];
+  let idleTimer=null;
+  let lastActivity=Date.now();
+  let sessionActive=false;
+
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmtNumber=n=>Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
   const dateParts=value=>{
@@ -55,6 +66,56 @@
     tab.classList.add('is-active');
     panel.classList.add('is-active');
     panel.hidden=false;
+  }
+
+  function removeActivityListeners(){
+    activityEvents.forEach(type=>window.removeEventListener(type,noteActivity,true));
+    document.removeEventListener('visibilitychange',checkIdleAfterBackground);
+    window.removeEventListener('pagehide',expireSession);
+  }
+
+  function expireSession(){
+    if(!sessionActive)return;
+    sessionActive=false;
+    token='';
+    clearTimeout(idleTimer);
+    idleTimer=null;
+    removeActivityListeners();
+    tab.textContent='🔒 My Day';
+    panel.innerHTML='<section class="panel"><p class="section-kicker">Session ended</p><h2>Tap your player card</h2><p class="setup-message">Your personal Game Day view closes after 10 minutes without activity. Tap your NFC card again to view your schedule and stats.</p></section>';
+  }
+
+  function armIdleTimer(){
+    if(!sessionActive)return;
+    clearTimeout(idleTimer);
+    const elapsed=Date.now()-lastActivity;
+    const remaining=IDLE_TIMEOUT_MS-elapsed;
+    if(remaining<=0){
+      expireSession();
+      return;
+    }
+    idleTimer=setTimeout(expireSession,remaining);
+  }
+
+  function noteActivity(){
+    if(!sessionActive)return;
+    lastActivity=Date.now();
+    armIdleTimer();
+  }
+
+  function checkIdleAfterBackground(){
+    if(!sessionActive||document.visibilityState!=='visible')return;
+    if(Date.now()-lastActivity>=IDLE_TIMEOUT_MS)expireSession();
+    else armIdleTimer();
+  }
+
+  function startSession(){
+    sessionActive=true;
+    lastActivity=Date.now();
+    activityEvents.forEach(type=>window.addEventListener(type,noteActivity,{capture:true,passive:true}));
+    document.addEventListener('visibilitychange',checkIdleAfterBackground);
+    window.addEventListener('pagehide',expireSession,{once:true});
+    armIdleTimer();
   }
 
   tab.addEventListener('click',e=>{
@@ -163,11 +224,14 @@
 
   async function load(){
     try{
-      const r=await fetch('/api/player-hq',{headers:{'X-Player-NFC':token},cache:'no-store'});
+      const sessionToken=token;
+      const r=await fetch('/api/player-hq',{headers:{'X-Player-NFC':sessionToken},cache:'no-store'});
       const data=await r.json();
       if(!r.ok)throw new Error(data.error||'Unable to load your player page.');
       render(data);
+      startSession();
     }catch(e){
+      token='';
       panel.innerHTML=`<section class="panel"><h2>Player page unavailable</h2><p class="setup-message">${esc(e.message||'Unable to load this player page.')}</p></section>`;
     }
     requestAnimationFrame(activate);
