@@ -14,7 +14,7 @@
   // The original scorekeeping system uses "Team Gold" as its internal fourth-team
   // identifier. Keep that stable for scoring compatibility, but display the real
   // team name — Yellow — everywhere a person sees it.
-  const yellowTeamContexts='button,option,.team-editor-card,.team-editor-note,.team-launch,.team-banner,.player-team-pill,.team-pill,.roster-card,.team-picks,.side,.pair-team,.event-pair__team,.seed-team,.seed-row,.team-name,[class*="team-"]';
+  const yellowTeamContexts='option,.team-editor-card,.team-editor-note,.team-launch,.team-banner,.player-team-pill,.team-pill,.roster-card,.team-picks,.side,.pair-team,.event-pair__team,.seed-team,.seed-row,.team-name,[class*="team-"]';
   const aliasTeamText=(root)=>{
     if(!root)return;
     if(root.nodeType===Node.TEXT_NODE){
