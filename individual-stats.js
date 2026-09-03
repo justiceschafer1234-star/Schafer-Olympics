@@ -28,7 +28,7 @@
   }
   function setSave(text,state=''){saveStrip.textContent=text;saveStrip.className='save-strip'+(state?` is-${state}`:'')}
   function eventIndex(){return Math.max(0,events.findIndex(e=>e.key===eventSelect.value))}
-  function setNav(){const i=eventIndex();$('#previous-event').disabled=!events.length||i<=0;$('#next-event').disabled=!events.length||i>=events.length-1}
+  function setNav(){const i=eventIndex(),locked=pending>0;eventSelect.disabled=locked;$('#previous-event').disabled=locked||!events.length||i<=0;$('#next-event').disabled=locked||!events.length||i>=events.length-1;$('#refresh-event').disabled=locked}
   function eventDescription(e){
     if(!e)return 'Stats and MVP values will appear here.';
     if(e.manual){const bits=(e.metrics||[]).map(m=>`${m.label} ×${fmt(m.weight)}`);return `${bits.join(' · ')}. MVP points are relative to the best raw performance across all teams.`}
@@ -49,7 +49,7 @@
   function playerCard(player,e){
     const score=`${fmt(player.mvpPoints)} / ${fmt(e.maxPoints)}`;
     if(e.manual)return `<article class="player-stat-card" data-player-card="${esc(player.id)}"><div class="player-stat-head"><div><h3>${esc(player.name)}</h3><small>${esc(team)}</small></div><div class="player-mvp-score"><span>MVP POINTS</span><strong>${esc(score)}</strong></div></div><div class="stat-rows">${(e.metrics||[]).map(m=>statRow(player,m)).join('')}</div><div class="raw-line"><span>Raw performance score</span><strong>${esc(fmt(player.rawScore))}</strong></div></article>`;
-    const details=(player.details||[]).map(d=>`<span class="auto-chip"><span>${esc(d.label)}</span><strong>${d.key==='finish'?esc(String(d.value)):esc(fmt(d.value))}</strong></span>`).join('');
+    const details=(player.details||[]).map(d=>`<span class="auto-chip"><span>${esc(d.label)}</span><strong>${d.key==='finish'||d.key==='team_finish'?esc(String(d.value)):esc(fmt(d.value))}</strong></span>`).join('');
     return `<article class="player-stat-card"><div class="player-stat-head"><div><h3>${esc(player.name)}</h3><small>${esc(team)}</small></div><div class="player-mvp-score"><span>MVP POINTS</span><strong>${esc(score)}</strong></div></div><div class="automatic-note">Calculated automatically from the official event result.</div>${details?`<div class="auto-details">${details}</div>`:''}<div class="raw-line"><span>Performance score</span><strong>${esc(fmt(player.rawScore))}</strong></div></article>`;
   }
   function renderPlayers(){
@@ -60,19 +60,19 @@
     if(e.manual)players.querySelectorAll('[data-stat]').forEach(b=>b.addEventListener('click',()=>changeStat(b.dataset.player,b.dataset.stat,Number(b.dataset.delta))));
   }
   async function loadEvent(key,{quiet=false}={}){
-    if(!key)return;if(!quiet){players.innerHTML='<div class="empty-state">Loading team participants…</div>';setSave('Loading…')}
+    if(!key||pending>0)return;if(!quiet){players.innerHTML='<div class="empty-state">Loading team participants…</div>';setSave('Loading…')}
     try{const d=await api('event',{eventKey:key});current={event:d.event,players:d.players||[]};renderPlayers();if(!quiet)setSave('Ready')}
     catch(e){players.innerHTML=`<div class="error-card">${esc(e.message)}</div>`;setSave(e.message,'error')}
   }
   function changeStat(playerId,statKey,delta){
     if(!current?.event?.manual)return;const p=current.players.find(x=>x.id===playerId);if(!p)return;
-    const next=Math.max(0,Number(p.stats?.[statKey]||0)+delta);p.stats={...(p.stats||{}),[statKey]:next};renderPlayers();pending++;setSave(`Saving ${pending} change${pending===1?'':'s'}…`,'saving');
+    const eventKey=current.event.key,next=Math.max(0,Number(p.stats?.[statKey]||0)+delta);p.stats={...(p.stats||{}),[statKey]:next};pending++;renderPlayers();setSave(`Saving ${pending} change${pending===1?'':'s'}…`,'saving');
     saveQueue=saveQueue.then(async()=>{
-      try{latestResponse=await api('setStat',{eventKey:current.event.key,participantId:playerId,statKey,value:next})}
-      catch(e){latestResponse=null;setSave(e.message,'error');await loadEvent(current.event.key,{quiet:true});throw e}
-      finally{pending=Math.max(0,pending-1)}
-      if(pending===0&&latestResponse){current={event:latestResponse.event,players:latestResponse.players||[]};latestResponse=null;renderPlayers();setSave('✓ All changes saved','saved')}
-    }).catch(()=>{});
+      try{latestResponse=await api('setStat',{eventKey,participantId:playerId,statKey,value:next})}
+      catch(e){latestResponse=null;setSave(e.message,'error');throw e}
+      finally{pending=Math.max(0,pending-1);setNav()}
+      if(pending===0&&latestResponse&&current?.event?.key===eventKey){current={event:latestResponse.event,players:latestResponse.players||[]};latestResponse=null;renderPlayers();setSave('✓ All changes saved','saved')}
+    }).catch(async()=>{if(pending===0&&current?.event?.key===eventKey)await loadEvent(eventKey,{quiet:true})});
   }
   async function loadApp(){
     app.hidden=false;unlock.hidden=true;setSave('Loading events…');
@@ -87,9 +87,9 @@
   }
   unlockForm.addEventListener('submit',async e=>{e.preventDefault();await unlockWith(codeInput.value.trim())});
   eventSelect.addEventListener('change',()=>loadEvent(eventSelect.value));
-  $('#previous-event').addEventListener('click',()=>{const i=eventIndex();if(i>0){eventSelect.value=events[i-1].key;loadEvent(eventSelect.value)}});
-  $('#next-event').addEventListener('click',()=>{const i=eventIndex();if(i<events.length-1){eventSelect.value=events[i+1].key;loadEvent(eventSelect.value)}});
-  $('#refresh-event').addEventListener('click',()=>loadEvent(eventSelect.value));
+  $('#previous-event').addEventListener('click',()=>{const i=eventIndex();if(pending===0&&i>0){eventSelect.value=events[i-1].key;loadEvent(eventSelect.value)}});
+  $('#next-event').addEventListener('click',()=>{const i=eventIndex();if(pending===0&&i<events.length-1){eventSelect.value=events[i+1].key;loadEvent(eventSelect.value)}});
+  $('#refresh-event').addEventListener('click',()=>{if(pending===0)loadEvent(eventSelect.value)});
 
   const saved=sessionStorage.getItem(STORAGE_KEY)||'';
   if(saved){verify(saved).then(ok=>{if(ok)loadApp();else{sessionStorage.removeItem(STORAGE_KEY);unlock.hidden=false}}).catch(()=>{sessionStorage.removeItem(STORAGE_KEY);unlock.hidden=false})}
