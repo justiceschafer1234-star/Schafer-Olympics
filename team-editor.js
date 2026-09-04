@@ -1,6 +1,6 @@
 (()=>{
 const TEAMS=['Team Red','Team Blue','Team Green','Team Gold'],STORAGE_KEY='schaferOlympicsControlCode';
-const CROSS_TEAM_PAIR_EVENTS=new Set(['egg-toss','cornhole-tournament']);
+const CROSS_TEAM_PAIR_EVENTS=new Set(['kahoot','egg-toss','cornhole-tournament']);
 const tab=document.querySelector('[data-tab="teams"]'),panel=document.querySelector('[data-panel="teams"]'),grid=document.querySelector('#team-editor-grid'),summary=document.querySelector('#team-editor-summary'),message=document.querySelector('#team-editor-message'),saveButton=document.querySelector('#team-editor-save'),balanceButton=document.querySelector('#team-editor-balance'),clearButton=document.querySelector('#team-editor-clear'),filter=document.querySelector('#team-editor-filter');if(!tab||!panel||!grid)return;
 let participants=[],events=[],loaded=false,dirty=false,eventEligible=[],eventPairs=[],pendingPick=null;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
