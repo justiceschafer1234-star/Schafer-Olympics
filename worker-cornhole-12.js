@@ -24,6 +24,20 @@ async function resolveCornhole(env){
 async function patchMatch(env,id,body){
   await sb(env,`cornhole_matches?id=eq.${id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify(body)});
 }
+async function updateMatch(env,match,body){
+  Object.assign(match,body);
+  await patchMatch(env,match.id,body);
+}
+async function fillTarget(env,target,label,players){
+  if(!target||!label)return;
+  const patch={};
+  if(!target.team_a){patch.team_a=label;patch.team_a_players=players||null}
+  else if(!target.team_b&&target.team_a!==label){patch.team_b=label;patch.team_b_players=players||null}
+  else return;
+  const a=patch.team_a??target.team_a,b=patch.team_b??target.team_b;
+  patch.status=a&&b?'Ready':'Waiting';
+  await updateMatch(env,target,patch);
+}
 async function setRoutes(env,matches,count){
   const byCode=new Map(matches.map(m=>[m.match_code,m]));
   const routes10={
@@ -43,7 +57,7 @@ async function setRoutes(env,matches,count){
   };
   const routes=count===12?routes12:routes10;
   for(const [code,[winner_to,loser_to]] of Object.entries(routes)){
-    const m=byCode.get(code);if(m)await patchMatch(env,m.id,{winner_to,loser_to});
+    const m=byCode.get(code);if(m){m.winner_to=winner_to;m.loser_to=loser_to;await patchMatch(env,m.id,{winner_to,loser_to})}
   }
 }
 async function seedCornhole(body,env){
@@ -52,7 +66,7 @@ async function seedCornhole(body,env){
   const [pairs,people,matches,eventParticipants]=await Promise.all([
     sb(env,`event_pairs?select=id,event_id,pair_number,olympic_team,participant_1_id,participant_2_id&event_id=eq.${event.id}&order=pair_number.asc`),
     sb(env,'participants?select=id,participant'),
-    sb(env,'cornhole_matches?select=id,match_code,status,score_a,score_b&order=sort_order.asc'),
+    sb(env,'cornhole_matches?select=id,match_code,status,score_a,score_b,team_a,team_b,team_a_players,team_b_players,winner,loser,winner_to,loser_to&order=sort_order.asc'),
     sb(env,`event_participants?select=id,event_id,participant_id,olympic_team,registered,event_team_number,seed,role,notes&event_id=eq.${event.id}`)
   ]);
   if(!pairs.length)return json({error:'Create and save Cornhole pairs first.'},400);
@@ -72,6 +86,7 @@ async function seedCornhole(body,env){
 
   await setRoutes(env,matches,pairs.length);
   await sb(env,'cornhole_matches?match_code=not.is.null',{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({team_a:null,team_b:null,team_a_players:null,team_b_players:null,score_a:null,score_b:null,winner:null,loser:null,status:'Waiting'})});
+  for(const m of matches)Object.assign(m,{team_a:null,team_b:null,team_a_players:null,team_b_players:null,score_a:null,score_b:null,winner:null,loser:null,status:'Waiting'});
   await sb(env,`event_pairs?event_id=eq.${event.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({seed:null})});
   await sb(env,`event_participants?event_id=eq.${event.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({seed:null})});
 
@@ -114,11 +129,32 @@ async function seedCornhole(body,env){
       ? [['W1',1,8],['W2',4,5],['W3',2,7],['W4',3,6]]
       : [['P1',8,9],['P2',7,10],['W1',1,null],['W2',4,5],['W3',2,null],['W4',3,6]];
   const byCode=new Map(matches.map(m=>[m.match_code,m]));
+
+  // First place every seeded opening slot so bye advancement cannot be overwritten by a later opening update.
   for(const [code,sa,sbSeed] of openings){
     const m=byCode.get(code);if(!m)continue;
     const a=seeded.get(sa),b=sbSeed?seeded.get(sbSeed):null;
-    await patchMatch(env,m.id,{team_a:a?.label||null,team_a_players:a?.players||null,team_b:b?.label||null,team_b_players:b?.players||null,status:a&&b?'Ready':'Waiting'});
+    await updateMatch(env,m,{team_a:a?.label||null,team_a_players:a?.players||null,team_b:b?.label||null,team_b_players:b?.players||null,status:a&&b?'Ready':'Waiting'});
   }
+
+  // Only the true first-round matches may auto-advance a missing opponent.
+  // Quarterfinal slots that intentionally wait for a preliminary winner are not byes.
+  const byeCodes=pairs.length<=8
+    ? new Set(['W1','W2','W3','W4'])
+    : pairs.length<12
+      ? new Set(['P1','P2'])
+      : new Set();
+  const byeWinnerTo={P1:'W1',P2:'W3',W1:'W5',W2:'W5',W3:'W6',W4:'W6'};
+  for(const [code,sa,sbSeed] of openings){
+    if(!byeCodes.has(code))continue;
+    const m=byCode.get(code);if(!m)continue;
+    const a=seeded.get(sa),b=sbSeed?seeded.get(sbSeed):null;
+    if(Boolean(a)===Boolean(b))continue;
+    const winner=a||b;
+    await updateMatch(env,m,{winner:winner.label,loser:null,score_a:null,score_b:null,status:'Complete'});
+    await fillTarget(env,byCode.get(byeWinnerTo[code]),winner.label,winner.players);
+  }
+
   return json({ok:true,seeded:seeds.length,reset:started,format:pairs.length===12?'12-team double elimination':'standard double elimination'});
 }
 

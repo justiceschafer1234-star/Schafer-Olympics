@@ -1,1 +1,111 @@
-(()=>{const root=document.querySelector('[data-four-team-tournament]');if(!root)return;const endpoint=root.dataset.endpoint;if(!endpoint)return;const ids=['SF1','SF2','B','F'];const q=s=>root.querySelector(s);const el=id=>q(`[data-match="${id}"]`);let matches=[];const teamClass=t=>({'Team Red':'team-red','Team Blue':'team-blue','Team Green':'team-green','Team Gold':'team-gold'}[t]||'team-tbd');function row(id){return matches.find(m=>m.properties?.Match===id)}function p(id){return row(id)?.properties||{}}function complete(id){return p(id).Status==='Complete'}function winner(id){return complete(id)?p(id).Winner||null:null}function loser(id){return complete(id)?p(id).Loser||null:null}function setBusy(on){root.querySelectorAll('button,input').forEach(x=>x.disabled=on||x.dataset.forceDisabled==='1')}function setTeam(node,team){const name=team||'TBD';node.textContent=name;node.className=`team team-bar ${teamClass(name)}`}function setFinish(node,team){if(!node)return;node.textContent=team||'TBD';node.closest('.medal')?.classList.remove('team-red','team-blue','team-green','team-gold');if(team)node.closest('.medal')?.classList.add(teamClass(team))}function renderMatch(id){const m=p(id),box=el(id);if(!box)return;const a=m['Team A']||'TBD',b=m['Team B']||'TBD',ready=a!=='TBD'&&b!=='TBD'&&a&&b;setTeam(box.querySelector('[data-team-a]'),a);setTeam(box.querySelector('[data-team-b]'),b);const ia=box.querySelector('[data-score-a]'),ib=box.querySelector('[data-score-b]');ia.value=Number.isFinite(m['Score A'])?m['Score A']:'';ib.value=Number.isFinite(m['Score B'])?m['Score B']:'';ia.dataset.forceDisabled=ready?'0':'1';ib.dataset.forceDisabled=ready?'0':'1';ia.disabled=!ready;ib.disabled=!ready;box.querySelector('[data-save]').dataset.forceDisabled=ready?'0':'1';box.querySelector('[data-save]').disabled=!ready;const st=box.querySelector('[data-state]'),wl=box.querySelector('[data-winner]');st.textContent=m.Status||'Waiting';if(complete(id)&&m.Winner){wl.textContent=`✓ ${m.Winner} wins`;wl.hidden=false}else wl.hidden=true}function render(){ids.forEach(renderMatch);setFinish(q('[data-gold]'),winner('F'));setFinish(q('[data-silver]'),loser('F'));setFinish(q('[data-bronze]'),winner('B'));setFinish(q('[data-copper]'),loser('B'));q('[data-complete-count]').textContent=ids.filter(complete).length}async function load(){setBusy(true);try{const r=await fetch(endpoint,{cache:'no-store'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load tournament.');matches=d.matches||[];render();const note=q('[data-sync-note]');if(note&&d.updatedAt)note.dataset.loaded='1'}catch(e){alert(e.message)}finally{setBusy(false);render()}}async function post(body){setBusy(true);try{const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not save result.');await load()}catch(e){alert(e.message);setBusy(false);render()}}root.addEventListener('click',e=>{const save=e.target.closest('[data-save]'),clear=e.target.closest('[data-clear]');if(save){const box=save.closest('[data-match]'),code=box.dataset.match,m=row(code);if(!m)return;const inputA=box.querySelector('[data-score-a]'),inputB=box.querySelector('[data-score-b]'),rawA=inputA.value.trim(),rawB=inputB.value.trim();if(rawA===''||rawB===''){alert('Enter both scores before saving.');return}const sa=Number(rawA),sb=Number(rawB);if(!Number.isFinite(sa)||!Number.isFinite(sb)||sa<0||sb<0||sa===sb){alert('Enter two valid, non-tied scores. If a soccer game is tied after regulation, enter the final shootout-decided score.');return}post({action:'save',matchId:m.id,scoreA:sa,scoreB:sb})}if(clear){const box=clear.closest('[data-match]'),m=row(box.dataset.match);if(m&&confirm('Clear this result? Any dependent medal-game result may also be reset.'))post({action:'clear',matchId:m.id})}});load()})();
+(()=>{
+  const root=document.querySelector('[data-four-team-tournament]');
+  if(!root)return;
+  const endpoint=root.dataset.endpoint;
+  if(!endpoint)return;
+
+  const control=new URLSearchParams(location.search).get('control')==='1';
+  const controlCode=()=>sessionStorage.getItem('schaferOlympicsControlCode')||'';
+  const ids=['SF1','SF2','B','F'];
+  const q=s=>root.querySelector(s);
+  const el=id=>q(`[data-match="${id}"]`);
+  let matches=[];
+
+  const teamClass=t=>({'Team Red':'team-red','Team Blue':'team-blue','Team Green':'team-green','Team Gold':'team-gold'}[t]||'team-tbd');
+  function row(id){return matches.find(m=>m.properties?.Match===id)}
+  function p(id){return row(id)?.properties||{}}
+  function complete(id){return p(id).Status==='Complete'}
+  function winner(id){return complete(id)?p(id).Winner||null:null}
+  function loser(id){return complete(id)?p(id).Loser||null:null}
+
+  function setBusy(on){
+    root.querySelectorAll('button,input').forEach(x=>x.disabled=on||!control||x.dataset.forceDisabled==='1');
+  }
+  function setTeam(node,team){
+    const name=team||'TBD';
+    node.textContent=name;
+    node.className=`team team-bar ${teamClass(name)}`;
+  }
+  function setFinish(node,team){
+    if(!node)return;
+    node.textContent=team||'TBD';
+    node.closest('.medal')?.classList.remove('team-red','team-blue','team-green','team-gold');
+    if(team)node.closest('.medal')?.classList.add(teamClass(team));
+  }
+  function renderMatch(id){
+    const m=p(id),box=el(id);
+    if(!box)return;
+    const a=m['Team A']||'TBD',b=m['Team B']||'TBD',ready=Boolean(a!=='TBD'&&b!=='TBD'&&a&&b);
+    setTeam(box.querySelector('[data-team-a]'),a);
+    setTeam(box.querySelector('[data-team-b]'),b);
+    const ia=box.querySelector('[data-score-a]'),ib=box.querySelector('[data-score-b]');
+    ia.value=Number.isFinite(m['Score A'])?m['Score A']:'';
+    ib.value=Number.isFinite(m['Score B'])?m['Score B']:'';
+    const editable=control&&ready;
+    ia.dataset.forceDisabled=editable?'0':'1';
+    ib.dataset.forceDisabled=editable?'0':'1';
+    ia.disabled=!editable;
+    ib.disabled=!editable;
+    const save=box.querySelector('[data-save]'),clear=box.querySelector('[data-clear]');
+    save.dataset.forceDisabled=editable?'0':'1';
+    clear.dataset.forceDisabled=control?'0':'1';
+    save.disabled=!editable;
+    clear.disabled=!control;
+    const st=box.querySelector('[data-state]'),wl=box.querySelector('[data-winner]');
+    st.textContent=m.Status||'Waiting';
+    if(complete(id)&&m.Winner){wl.textContent=`✓ ${m.Winner} wins`;wl.hidden=false}else wl.hidden=true;
+  }
+  function render(){
+    ids.forEach(renderMatch);
+    setFinish(q('[data-gold]'),winner('F'));
+    setFinish(q('[data-silver]'),loser('F'));
+    setFinish(q('[data-bronze]'),winner('B'));
+    setFinish(q('[data-copper]'),loser('B'));
+    q('[data-complete-count]').textContent=ids.filter(complete).length;
+    const note=q('[data-sync-note]');
+    if(note&&!control)note.textContent='Read-only view. Open Adult Soccer from Game Day HQ Control View to enter or clear scores.';
+  }
+  async function load(){
+    setBusy(true);
+    try{
+      const r=await fetch(endpoint,{cache:'no-store'}),d=await r.json();
+      if(!r.ok)throw new Error(d.error||'Could not load tournament.');
+      matches=d.matches||[];
+      render();
+      const note=q('[data-sync-note]');
+      if(note&&d.updatedAt)note.dataset.loaded='1';
+    }catch(e){alert(e.message)}
+    finally{setBusy(false);render()}
+  }
+  async function post(body){
+    if(!control)return;
+    const code=controlCode();
+    if(!code){alert('Control View is locked. Return to Game Day HQ and unlock Control View again.');return;}
+    setBusy(true);
+    try{
+      const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,code})}),d=await r.json();
+      if(!r.ok)throw new Error(d.error||'Could not save result.');
+      await load();
+    }catch(e){alert(e.message);setBusy(false);render()}
+  }
+
+  root.addEventListener('click',e=>{
+    if(!control)return;
+    const save=e.target.closest('[data-save]'),clear=e.target.closest('[data-clear]');
+    if(save){
+      const box=save.closest('[data-match]'),matchCode=box.dataset.match,m=row(matchCode);
+      if(!m)return;
+      const inputA=box.querySelector('[data-score-a]'),inputB=box.querySelector('[data-score-b]'),rawA=inputA.value.trim(),rawB=inputB.value.trim();
+      if(rawA===''||rawB===''){alert('Enter both scores before saving.');return;}
+      const sa=Number(rawA),sb=Number(rawB);
+      if(!Number.isFinite(sa)||!Number.isFinite(sb)||sa<0||sb<0||sa===sb){alert('Enter two valid, non-tied scores. If a soccer game is tied after regulation, enter the final shootout-decided score.');return;}
+      post({action:'save',matchId:m.id,scoreA:sa,scoreB:sb});
+    }
+    if(clear){
+      const box=clear.closest('[data-match]'),m=row(box.dataset.match);
+      if(m&&confirm('Clear this result? Any dependent medal-game result may also be reset.'))post({action:'clear',matchId:m.id});
+    }
+  });
+
+  load();
+})();
