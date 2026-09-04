@@ -137,9 +137,16 @@ async function seedCornhole(body,env){
     await updateMatch(env,m,{team_a:a?.label||null,team_a_players:a?.players||null,team_b:b?.label||null,team_b_players:b?.players||null,status:a&&b?'Ready':'Waiting'});
   }
 
-  // Resolve opening byes once, during the protected seeding write. Public GET requests stay read-only.
+  // Only the true first-round matches may auto-advance a missing opponent.
+  // Quarterfinal slots that intentionally wait for a preliminary winner are not byes.
+  const byeCodes=pairs.length<=8
+    ? new Set(['W1','W2','W3','W4'])
+    : pairs.length<12
+      ? new Set(['P1','P2'])
+      : new Set();
   const byeWinnerTo={P1:'W1',P2:'W3',W1:'W5',W2:'W5',W3:'W6',W4:'W6'};
   for(const [code,sa,sbSeed] of openings){
+    if(!byeCodes.has(code))continue;
     const m=byCode.get(code);if(!m)continue;
     const a=seeded.get(sa),b=sbSeed?seeded.get(sbSeed):null;
     if(Boolean(a)===Boolean(b))continue;
