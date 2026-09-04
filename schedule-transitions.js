@@ -20,24 +20,33 @@
     return row;
   }
 
+  let rendering=false;
   function addTransitions(){
-    schedule.querySelectorAll('[data-schedule-transition="1"]').forEach(node=>node.remove());
-    const rows=[...schedule.querySelectorAll('.schedule-item')];
+    if(rendering)return;
+    const rows=[...schedule.querySelectorAll('.schedule-item:not([data-schedule-transition="1"])')];
     if(!rows.length)return;
 
+    rendering=true;
+    observer.disconnect();
+    schedule.querySelectorAll('[data-schedule-transition="1"]').forEach(node=>node.remove());
+
     transitions.forEach(item=>{
-      const target=[...schedule.querySelectorAll('.schedule-item')].find(row=>row.querySelector('.schedule-title')?.textContent?.trim()===item.before);
+      const target=[...schedule.querySelectorAll('.schedule-item:not([data-schedule-transition="1"])')].find(row=>row.querySelector('.schedule-title')?.textContent?.trim()===item.before);
       if(target)target.before(makeTransition(item));
     });
+
+    observer.observe(schedule,{childList:true});
+    rendering=false;
   }
 
   let queued=false;
   const queue=()=>{
-    if(queued)return;
+    if(queued||rendering)return;
     queued=true;
     requestAnimationFrame(()=>{queued=false;addTransitions();});
   };
 
-  new MutationObserver(queue).observe(schedule,{childList:true});
+  const observer=new MutationObserver(queue);
+  observer.observe(schedule,{childList:true});
   queue();
 })();
