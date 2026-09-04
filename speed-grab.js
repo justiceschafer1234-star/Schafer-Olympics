@@ -1,7 +1,7 @@
 (()=>{
 const qs=new URLSearchParams(location.search),control=qs.get('control')==='1',code=()=>sessionStorage.getItem('schaferOlympicsControlCode')||'';
 const TEAM_CLASS={'Team Red':'team-red','Team Blue':'team-blue','Team Green':'team-green','Team Gold':'team-gold'};
-const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let data=null,state={},saving=false,pendingSave=false,editVersion=0;
 const shuffle=a=>{const x=[...a];for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[x[i],x[j]]=[x[j],x[i]]}return x};
 function entries(){return (data?.participants||[]).filter(p=>p.team).map(p=>({id:p.id,label:p.name,team:p.team,teams:[p.team]}))}
