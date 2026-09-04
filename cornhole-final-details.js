@@ -1,5 +1,4 @@
 (()=>{
-  const TEAM_RE=/(Team\s+(?:Red|Blue|Green|Gold))/i;
   let working=false;
 
   function seedMap(){
@@ -9,7 +8,7 @@
       if(!Number.isFinite(seed))return;
       const players=row.querySelector('.seed-team strong')?.textContent?.trim()||'';
       const meta=row.querySelector('.seed-team small')?.textContent||'';
-      const olympicTeam=meta.match(TEAM_RE)?.[1]||'';
+      const olympicTeam=meta.includes('·')?meta.split('·').slice(1).join('·').trim():'';
       map.set(seed,{players,olympicTeam});
     });
     return map;
@@ -32,17 +31,11 @@
         if(!Number.isFinite(seed))return;
         const info=seeds.get(seed);
         if(!info)return;
-
         const desiredStrong=info.players||`Seed ${seed}`;
         if(strong.textContent!==desiredStrong)strong.textContent=desiredStrong;
-
         let meta=small;
-        if(!meta){
-          meta=document.createElement('small');
-          strong.after(meta);
-        }
+        if(!meta){meta=document.createElement('small');strong.after(meta)}
         if(meta.className!=='cornhole-final-meta')meta.className='cornhole-final-meta';
-
         const desiredHtml=`${info.olympicTeam?`<span class="cornhole-final-team">${info.olympicTeam}</span>`:''}<span class="cornhole-final-seed">Seed ${seed}</span>`;
         if(meta.innerHTML!==desiredHtml)meta.innerHTML=desiredHtml;
       });
@@ -64,10 +57,7 @@
   const observer=new MutationObserver(()=>{
     if(queued||working)return;
     queued=true;
-    requestAnimationFrame(()=>{
-      queued=false;
-      enhance();
-    });
+    requestAnimationFrame(()=>{queued=false;enhance()});
   });
   observer.observe(document.documentElement,{childList:true,subtree:true});
   document.addEventListener('DOMContentLoaded',enhance);
