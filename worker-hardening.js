@@ -2,7 +2,6 @@ import app from './worker-nfc.js';
 
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 const base=e=>String(e.SUPABASE_URL||'').replace(/\/+$/,'').replace(/\/rest\/v1$/,'');
-const num=v=>Number.isFinite(Number(v))?Number(v):0;
 
 async function sb(env,path){
   const url=base(env);
@@ -58,16 +57,16 @@ export default{
     const url=new URL(request.url),path=url.pathname;
     try{
       // Public bracket loads are strictly read-only. All bracket reconciliation now happens on writes/seeding.
-      if(request.method==='GET'&&path==='/api/adult-soccer')return readOnlyFour(env,'adult_soccer_matches');
-      if(request.method==='GET'&&path==='/api/wiffle-ball')return readOnlyFour(env,'wiffle_ball_matches');
-      if(request.method==='GET'&&path==='/api/cornhole')return readOnlyCornhole(env);
+      if(request.method==='GET'&&path==='/api/adult-soccer')return await readOnlyFour(env,'adult_soccer_matches');
+      if(request.method==='GET'&&path==='/api/wiffle-ball')return await readOnlyFour(env,'wiffle_ball_matches');
+      if(request.method==='GET'&&path==='/api/cornhole')return await readOnlyCornhole(env);
 
       // Adult Soccer used to rely on UI-only protection. Enforce the same control code as every other score writer.
       if(request.method==='POST'&&path==='/api/adult-soccer'){
         const body=await bodyOf(request);
         if(!env.ADMIN_SCORE_CODE)return json({error:'ADMIN_SCORE_CODE is missing.'},503);
         if(!validCode(body,env))return json({error:'Incorrect control code.'},401);
-        return app.fetch(request,env,ctx);
+        return await app.fetch(request,env,ctx);
       }
 
       // Final Olympic teams are locked. Event-pair setup and tournament seeding remain available.
@@ -79,7 +78,7 @@ export default{
       // Registration is closed, while GET remains available to private dashboards/setup tools.
       if(request.method==='POST'&&path==='/api/registration')return json({error:'Registration is closed for Game Day.'},403);
 
-      return app.fetch(request,env,ctx);
+      return await app.fetch(request,env,ctx);
     }catch(e){return json({error:String(e?.message||e)},502)}
   }
 };
