@@ -17,9 +17,14 @@ async function requireCode(request,env){if(!env.ADMIN_SCORE_CODE)throw Object.as
 async function saveScore(request,env){
   try{
     const b=await requireCode(request,env),matchId=String(b.matchId||''),a=Number(b.scoreA),bb=Number(b.scoreB),allowWinnerChange=Boolean(b.allowWinnerChange);
-    if(!matchId||!Number.isFinite(a)||!Number.isFinite(bb)||a<0||bb<0||a===bb)return json({error:'Enter both teams and a non-tied score.'},400);
+    if(!matchId||!Number.isFinite(a)||!Number.isFinite(bb)||a<0||bb<0)return json({error:'Enter valid scores.'},400);
+    const base=cleanBase(env.SUPABASE_URL);
+    if(a===bb){
+      const mr=await fetch(`${base}/rest/v1/wiffle_ball_matches?select=match_code&notion_page_id=eq.${encodeURIComponent(matchId)}&limit=1`,{headers:{apikey:env.SUPABASE_SECRET_KEY}}),rows=mr.ok?await mr.json():[];
+      if(rows[0]?.match_code!=='B')return json({error:'Only the Bronze Medal Match may end in a tie.'},400);
+    }
     const d=await rpc(env,'save_wiffle_ball_score',{p_match_notion_id:matchId,p_score_a:a,p_score_b:bb,p_allow_winner_change:allowWinnerChange});
-    return json({ok:true,winner:d.winner||'',loser:d.loser||'',winnerChanged:Boolean(d.winnerChanged),resetCount:Number(d.resetCount||0),matches:(d.matches||[]).map(legacyMatch),source:'supabase-fast'});
+    return json({ok:true,winner:d.winner||'',loser:d.loser||'',tie:Boolean(d.tie),winnerChanged:Boolean(d.winnerChanged),resetCount:Number(d.resetCount||0),matches:(d.matches||[]).map(legacyMatch),source:'supabase-fast'});
   }catch(e){
     const message=e.message||String(e),needsWinnerChangeConfirmation=message.includes('Confirm the reset first');
     return json({error:message,needsWinnerChangeConfirmation},needsWinnerChangeConfirmation?409:(e.status||502));
