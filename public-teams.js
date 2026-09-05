@@ -4,10 +4,33 @@
     'Team Red':{icon:'🔴',label:'Red Team'},
     'Team Blue':{icon:'🔵',label:'Blue Team'},
     'Team Green':{icon:'🟢',label:'Green Team'},
-    'Team Gold':{icon:'🟡',label:'Gold Team'}
+    'Team Gold':{icon:'🟡',label:'Yellow Team'}
   };
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let loaded=false;
+
+  function injectUi(){
+    if(document.querySelector('.tab[data-tab="public-teams"]'))return;
+    const nav=document.querySelector('nav.tabs');
+    const main=document.querySelector('main.shell');
+    if(!nav||!main)return;
+    const adminTab=nav.querySelector('.admin-tab');
+    const tab=document.createElement('button');
+    tab.className='tab';tab.type='button';tab.dataset.tab='public-teams';tab.textContent='👥 Team Rosters';
+    nav.insertBefore(tab,adminTab||null);
+    const panel=document.createElement('section');
+    panel.className='tab-panel';panel.dataset.panel='public-teams';panel.hidden=true;
+    panel.innerHTML='<section class="panel"><div class="panel__header panel__header--wrap"><div><p class="section-kicker">Olympic teams</p><h2>Team Rosters</h2><p id="public-team-rosters-note" class="public-team-rosters-note">Current official team assignments</p></div><button id="public-team-rosters-refresh" class="refresh" type="button">↻ Refresh</button></div><div id="public-team-rosters" class="public-team-rosters"><div class="team-rosters-loading">Open this tab to load the rosters.</div></div></section>';
+    const firstPanel=main.querySelector('.tab-panel');
+    main.insertBefore(panel,firstPanel||null);
+
+    tab.addEventListener('click',()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('is-active',t===tab));
+      document.querySelectorAll('.tab-panel').forEach(p=>{const active=p===panel;p.hidden=!active;p.classList.toggle('is-active',active)});
+      if(!loaded)load();
+    });
+    panel.querySelector('#public-team-rosters-refresh')?.addEventListener('click',()=>{loaded=false;load()});
+  }
 
   async function load(){
     const root=document.getElementById('public-team-rosters');
@@ -35,7 +58,5 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded',()=>{
-    document.querySelector('.tab[data-tab="public-teams"]')?.addEventListener('click',()=>{if(!loaded)load()});
-  });
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',injectUi,{once:true});else injectUi();
 })();
