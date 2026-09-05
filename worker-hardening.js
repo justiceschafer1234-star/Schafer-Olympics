@@ -53,6 +53,7 @@ async function readOnlyCornhole(env){
 }
 
 function eventPoints(r){
+  if(r?.status!=='Complete')return Object.fromEntries(SCORE_TEAMS.map(t=>[t,0]));
   const overrides=r?.team_point_overrides&&typeof r.team_point_overrides==='object'?r.team_point_overrides:{};
   if(Object.keys(overrides).length)return Object.fromEntries(SCORE_TEAMS.map(t=>[t,scoreNum(overrides[t])]));
   const out=Object.fromEntries(SCORE_TEAMS.map(t=>[t,0]));
