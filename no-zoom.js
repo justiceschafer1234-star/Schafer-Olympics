@@ -75,6 +75,12 @@
       link.href='/public-teams.css?v=1';
       document.head.appendChild(link);
     }
+    if(!document.querySelector('link[href*="medal-mobile.css"]')){
+      const medalLink=document.createElement('link');
+      medalLink.rel='stylesheet';
+      medalLink.href='/medal-mobile.css?v=1';
+      document.head.appendChild(medalLink);
+    }
     if(!document.querySelector('script[src*="public-teams.js"]')){
       const teams=document.createElement('script');
       teams.src='/public-teams.js?v=1';
