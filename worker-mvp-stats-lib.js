@@ -24,7 +24,7 @@ function invalidate(){cached=null;cachedAt=0}
 
 export async function loadMvpSnapshot(env,{fresh=false}={}){
   if(!fresh&&cached&&Date.now()-cachedAt<3000)return cached;
-  const [rules,events,participants,registrations,stats,cards,pairs,eggResults,cornholeMatches]=await Promise.all([
+  const [rules,events,participants,registrations,stats,cards,pairs,eventParticipants,eggResults,cornholeMatches]=await Promise.all([
     sb(env,'mvp_event_rules?select=event_id,event_key,scoring_mode,metrics,kids_multiplier,placement_bonuses,notes'),
     sb(env,'olympic_events?select=id,event,event_key,event_number,status,gold_points,silver_points,bronze_1_points,bronze_2_points,gold_teams,silver_teams,bronze_1_teams,bronze_2_teams&order=event_number.asc'),
     sb(env,'participants?select=id,notion_page_id,participant,team&order=participant.asc'),
@@ -32,10 +32,11 @@ export async function loadMvpSnapshot(env,{fresh=false}={}){
     sb(env,'player_event_stats?select=event_id,participant_id,stats,editor_team,updated_at'),
     sb(env,'event_scorecards?select=event_id,format_key,state,updated_at'),
     sb(env,'event_pairs?select=id,event_id,pair_number,olympic_team,participant_1_id,participant_2_id,seed&order=event_id.asc,pair_number.asc'),
+    sb(env,'event_participants?select=event_id,participant_id,event_team_number,registered&registered=eq.true&order=event_id.asc,event_team_number.asc'),
     sb(env,'egg_toss_results?select=pair_id,out_order,updated_at'),
     sb(env,'cornhole_matches?select=match_code,bracket,round_number,match_number,team_a,team_b,score_a,score_b,winner,loser,status,sort_order&order=sort_order.asc')
   ]);
-  cached={rules,events,participants,registrations,stats,cards,pairs,eggResults,cornholeMatches};cachedAt=Date.now();return cached;
+  cached={rules,events,participants,registrations,stats,cards,pairs,eventParticipants,eggResults,cornholeMatches};cachedAt=Date.now();return cached;
 }
 
 function maps(s){
@@ -50,8 +51,10 @@ function maps(s){
   for(const r of s.registrations){const k=String(r.event_id);if(!registrationsByEvent.has(k))registrationsByEvent.set(k,new Set());registrationsByEvent.get(k).add(String(r.participant_id))}
   const pairsByEvent=new Map();
   for(const p of s.pairs){const k=String(p.event_id);if(!pairsByEvent.has(k))pairsByEvent.set(k,[]);pairsByEvent.get(k).push(p)}
+  const eventParticipantsByEvent=new Map();
+  for(const p of s.eventParticipants||[]){const k=String(p.event_id);if(!eventParticipantsByEvent.has(k))eventParticipantsByEvent.set(k,[]);eventParticipantsByEvent.get(k).push(p)}
   const eggByPair=new Map(s.eggResults.map(x=>[String(x.pair_id),x]));
-  return{ruleByEvent,ruleByKey,eventById,eventByKey,personById,cardByEvent,statByKey,registrationsByEvent,pairsByEvent,eggByPair};
+  return{ruleByEvent,ruleByKey,eventById,eventByKey,personById,cardByEvent,statByKey,registrationsByEvent,pairsByEvent,eventParticipantsByEvent,eggByPair};
 }
 
 function eventPoints(event,place){
@@ -84,8 +87,15 @@ function calculateManual(ctx,event,rule,registered){
 }
 
 function calculatePairScore(ctx,event,rule,registered){
-  const by=new Map([...registered].map(pid=>[pid,emptyResult(pid)])),pairs=ctx.pairsByEvent.get(String(event.id))||[],state=ctx.cardByEvent.get(String(event.id))?.state||{},entries=arr(state.entries),entryById=new Map(entries.map(e=>[String(e.id),e]));let maxRaw=0;
-  for(const pair of pairs){const e=entryById.get(String(pair.id)),score=e&&e.score!==null&&e.score!==''?num(e.score):0;maxRaw=Math.max(maxRaw,score);for(const pid of pairParticipants(pair))if(registered.has(pid))by.set(pid,{participantId:pid,stats:{},details:[{key:'kahoot_score',label:'Kahoot Score',value:score,weight:1}],rawScore:score,mvpPoints:0,place:null})}
+  const by=new Map([...registered].map(pid=>[pid,emptyResult(pid)])),state=ctx.cardByEvent.get(String(event.id))?.state||{},entries=arr(state.entries),entryById=new Map(entries.map(e=>[String(e.id),e]));let maxRaw=0;
+  if(String(event.event_key)==='kahoot'){
+    const groups=new Map();
+    for(const ep of ctx.eventParticipantsByEvent.get(String(event.id))||[]){const n=Number(ep.event_team_number);if(!Number.isFinite(n)||n<=0)continue;if(!groups.has(n))groups.set(n,[]);groups.get(n).push(String(ep.participant_id))}
+    for(const [n,pids] of groups){const e=entryById.get(`kahoot-${n}`),score=e&&e.score!==null&&e.score!==''?num(e.score):0;maxRaw=Math.max(maxRaw,score);for(const pid of pids)if(registered.has(pid))by.set(pid,{participantId:pid,stats:{},details:[{key:'kahoot_score',label:'Kahoot Score',value:score,weight:1}],rawScore:score,mvpPoints:0,place:null})}
+  }else{
+    const pairs=ctx.pairsByEvent.get(String(event.id))||[];
+    for(const pair of pairs){const e=entryById.get(String(pair.id)),score=e&&e.score!==null&&e.score!==''?num(e.score):0;maxRaw=Math.max(maxRaw,score);for(const pid of pairParticipants(pair))if(registered.has(pid))by.set(pid,{participantId:pid,stats:{},details:[{key:'pair_score',label:'Pair Score',value:score,weight:1}],rawScore:score,mvpPoints:0,place:null})}
+  }
   const cap=maxPoints(event,rule);for(const x of by.values())x.mvpPoints=normalized(x.rawScore,maxRaw,cap);return by;
 }
 
