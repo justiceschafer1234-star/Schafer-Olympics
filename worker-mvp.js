@@ -1,4 +1,4 @@
-import app from './worker-hardening.js';
+import app from './worker-public-teams.js';
 import {adminMvpStats,getPlayerMvp,loadMvpSnapshot} from './worker-mvp-stats-lib.js';
 
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
