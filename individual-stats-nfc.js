@@ -6,9 +6,10 @@
   const STORAGE_KEY='schaferOlympicsControlCode';
   const MARKER='__nfc_team_access__';
   const nativeFetch=window.fetch.bind(window);
-  sessionStorage.setItem(STORAGE_KEY,MARKER);
-  document.body.dataset.nfcAccess='true';
 
+  // Install the fetch shim before exposing the NFC session marker.
+  // This guarantees individual-stats.js cannot start verification until
+  // /api/admin/verify and /api/admin/mvp-stats are intercepted.
   window.fetch=async(input,init={})=>{
     const rawUrl=typeof input==='string'?input:input?.url||'';
     const url=new URL(rawUrl,location.origin);
@@ -37,4 +38,7 @@
 
     return nativeFetch(input,init);
   };
+
+  sessionStorage.setItem(STORAGE_KEY,MARKER);
+  document.body.dataset.nfcAccess='true';
 })();
