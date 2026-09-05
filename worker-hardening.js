@@ -2,6 +2,9 @@ import app from './worker-nfc.js';
 
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 const base=e=>String(e.SUPABASE_URL||'').replace(/\/+$/,'').replace(/\/rest\/v1$/,'');
+const SCORE_TEAMS=['Team Red','Team Blue','Team Green','Team Gold'];
+const SCORE_PROP={'Team Red':'🔴 Red Points','Team Blue':'🔵 Blue Points','Team Green':'🟢 Green Points','Team Gold':'🟡 Gold Points'};
+const scoreNum=v=>Number.isFinite(Number(v))?Number(v):0;
 
 async function sb(env,path){
   const url=base(env);
@@ -49,6 +52,45 @@ async function readOnlyCornhole(env){
   return json({matches:rows.map(r=>matchLegacy(r,true)),updatedAt:new Date().toISOString(),source:'supabase-readonly'});
 }
 
+function eventPoints(r){
+  const overrides=r?.team_point_overrides&&typeof r.team_point_overrides==='object'?r.team_point_overrides:{};
+  if(Object.keys(overrides).length)return Object.fromEntries(SCORE_TEAMS.map(t=>[t,scoreNum(overrides[t])]));
+  const out=Object.fromEntries(SCORE_TEAMS.map(t=>[t,0]));
+  for(const t of r.gold_teams||[])if(t in out)out[t]+=scoreNum(r.gold_points);
+  for(const t of r.silver_teams||[])if(t in out)out[t]+=scoreNum(r.silver_points);
+  for(const t of r.bronze_1_teams||[])if(t in out)out[t]+=scoreNum(r.bronze_1_points);
+  for(const t of r.bronze_2_teams||[])if(t in out)out[t]+=scoreNum(r.bronze_2_points);
+  return out;
+}
+
+async function scoresWithOverrides(request,env,ctx){
+  const response=await app.fetch(request,env,ctx);
+  if(!response.ok)return response;
+  let data;try{data=await response.json()}catch{return response}
+  if(!data||data.error)return json(data,response.status);
+  const events=await sb(env,'olympic_events?select=*&order=event_number.asc');
+  const totals=Object.fromEntries(SCORE_TEAMS.map(t=>[t,0]));
+  const byNotion=new Map();
+  for(const event of events){
+    const pts=eventPoints(event);
+    for(const team of SCORE_TEAMS)totals[team]+=pts[team];
+    if(event.notion_page_id)byNotion.set(String(event.notion_page_id),pts);
+  }
+  const standings=SCORE_TEAMS.map(team=>({team,points:totals[team]})).sort((a,b)=>b.points-a.points);
+  const remaining=events.filter(r=>r.status!=='Complete').reduce((sum,r)=>sum+scoreNum(r.gold_points),0);
+  data.standings=standings;
+  data.race={...(data.race||{}),completedEvents:events.filter(r=>r.status==='Complete').length,totalEvents:events.length,remainingGoldPoints:remaining,maximumPossible:standings.map(x=>({team:x.team,currentPoints:x.points,maximumPoints:x.points+remaining}))};
+  data.rows=(data.rows||[]).map(row=>{
+    const pts=byNotion.get(String(row.id||''));
+    if(!pts)return row;
+    const properties={...(row.properties||{})};
+    for(const team of SCORE_TEAMS)properties[SCORE_PROP[team]]=pts[team];
+    return{...row,properties};
+  });
+  data.updatedAt=new Date().toISOString();
+  return json(data,response.status);
+}
+
 async function bodyOf(request){try{return await request.clone().json()}catch{return{}}}
 function validCode(body,env){return Boolean(env.ADMIN_SCORE_CODE)&&String(body?.code||'')===String(env.ADMIN_SCORE_CODE)}
 
@@ -56,6 +98,8 @@ export default{
   async fetch(request,env,ctx){
     const url=new URL(request.url),path=url.pathname;
     try{
+      if(request.method==='GET'&&path==='/api/scores')return await scoresWithOverrides(request,env,ctx);
+
       // Public bracket loads are strictly read-only. All bracket reconciliation now happens on writes/seeding.
       if(request.method==='GET'&&path==='/api/adult-soccer')return await readOnlyFour(env,'adult_soccer_matches');
       if(request.method==='GET'&&path==='/api/wiffle-ball')return await readOnlyFour(env,'wiffle_ball_matches');
