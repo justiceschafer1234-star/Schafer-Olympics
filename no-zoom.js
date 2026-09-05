@@ -68,6 +68,21 @@
     document.head.appendChild(script);
   }
 
+  if(path==='/gameday-hq'||path==='/gameday-hq.html'){
+    if(!document.querySelector('link[href*="public-teams.css"]')){
+      const link=document.createElement('link');
+      link.rel='stylesheet';
+      link.href='/public-teams.css?v=1';
+      document.head.appendChild(link);
+    }
+    if(!document.querySelector('script[src*="public-teams.js"]')){
+      const teams=document.createElement('script');
+      teams.src='/public-teams.js?v=1';
+      teams.defer=true;
+      document.head.appendChild(teams);
+    }
+  }
+
   const teamEventPaths=new Set([
     '/adult-soccer','/adult-soccer.html',
     '/cornhole-tournament','/cornhole-tournament.html',
