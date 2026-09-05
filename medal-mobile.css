@@ -1,0 +1,12 @@
+@media(max-width:560px){
+  [data-panel="medals"] .panel{overflow:visible}
+  [data-panel="medals"] .medal-table{padding:8px 10px 14px;overflow:visible}
+  [data-panel="medals"] .medal-row{min-width:0;grid-template-columns:28px minmax(92px,1fr) repeat(4,38px);gap:5px;padding:12px 2px;font-size:.82rem}
+  [data-panel="medals"] .medal-row.header{font-size:.58rem;letter-spacing:.03em}
+  [data-panel="medals"] .medal-team{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  [data-panel="medals"] .medal-count{font-size:.8rem;text-align:center}
+}
+@media(max-width:390px){
+  [data-panel="medals"] .medal-row{grid-template-columns:24px minmax(78px,1fr) repeat(4,34px);gap:3px;font-size:.76rem}
+  [data-panel="medals"] .medal-row.header{font-size:.53rem}
+}
