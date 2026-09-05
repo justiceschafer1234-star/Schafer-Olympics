@@ -1,6 +1,6 @@
 (()=>{
   const STORAGE_KEY='schaferOlympicsControlCode';
-  const TEAM_MAP={red:'Team Red',blue:'Team Blue',green:'Team Green',gold:'Team Gold'};
+  const TEAM_MAP={red:'Team Red',blue:'Team Blue',green:'Team Green',gold:'Team Gold',yellow:'Team Gold'};
   const qs=new URLSearchParams(location.search),teamKey=String(qs.get('team')||'').toLowerCase(),team=TEAM_MAP[teamKey]||'';
   const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt=n=>Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
