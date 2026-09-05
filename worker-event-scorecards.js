@@ -12,7 +12,7 @@ const RULES={
   'speed-volleyball-volleyball':{mode:'round-total',title:'Speed Volleyball',minRounds:2,maxRounds:4,places:4},
   'water-tasting':{mode:'individual',title:'Water Tasting',places:3},
   'fill-the-water-bottle':{mode:'game',title:'Fill the Water Bottle',combined:true,places:2},
-  'protect-the-balloon-baby':{mode:'game',title:'Protect the Balloon Baby',combined:true,places:2,noPoints:true},
+  'protect-the-balloon-baby':{mode:'game',title:'Protect the Balloon Baby',combined:true,places:2},
   'kids-dodgeball':{mode:'series',title:'Kids Dodgeball',combined:true,bestOf:3,places:2},
   'women-s-dodgeball':{mode:'series',title:'Women’s Dodgeball',combined:true,bestOf:3,places:2},
   'men-s-dodgeball':{mode:'series',title:'Men’s Dodgeball',combined:true,bestOf:3,places:2}
