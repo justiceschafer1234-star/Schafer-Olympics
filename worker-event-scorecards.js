@@ -36,13 +36,30 @@ function outcome(rule,state){let p={gold:[],silver:[],bronze1:[],bronze2:[]},com
   else if(rule.mode==='bracket'){const byId=new Map((state.entries||[]).map(e=>[e.id,e])),ids=state.placements||[];if(ids[0]&&ids[1]){p.gold=uniq(byId.get(ids[0])?.teams);p.silver=uniq(byId.get(ids[1])?.teams);p.bronze1=uniq(ids.slice(2).flatMap(id=>byId.get(id)?.teams||[]));complete=Boolean(state.complete)}}
   return{podium:p,complete};
 }
-async function load(env,key){const rule=RULES[key];if(!rule)throw new Error('This event does not have a scorecard yet.');const es=await sb(env,`olympic_events?select=*&event_key=eq.${enc(key)}&limit=1`),event=es[0];if(!event)throw new Error('Event not found.');const [card,people,regs,pairs]=await Promise.all([
+async function load(env,key){const rule=RULES[key];if(!rule)throw new Error('This event does not have a scorecard yet.');const es=await sb(env,`olympic_events?select=*&event_key=eq.${enc(key)}&limit=1`),event=es[0];if(!event)throw new Error('Event not found.');const [card,people,regs,pairs,eventParticipants]=await Promise.all([
     sb(env,`event_scorecards?select=format_key,state,updated_at&event_id=eq.${event.id}&limit=1`),
     sb(env,'participants?select=id,participant,participant_key,team&order=participant.asc'),
     sb(env,`registrations?select=participant_id&event_id=eq.${event.id}`),
-    sb(env,`event_pairs?select=id,pair_number,olympic_team,participant_1_id,participant_2_id&event_id=eq.${event.id}&order=pair_number.asc`)
+    sb(env,`event_pairs?select=id,pair_number,olympic_team,participant_1_id,participant_2_id&event_id=eq.${event.id}&order=pair_number.asc`),
+    key==='kahoot'?sb(env,`event_participants?select=id,participant_id,olympic_team,event_team_number,registered&event_id=eq.${event.id}&registered=eq.true&order=event_team_number.asc,participant_id.asc`):Promise.resolve([])
   ]),registered=new Set(regs.map(x=>x.participant_id)),byId=new Map(people.map(x=>[x.id,x]));
-  return{ok:true,rule,event:{id:event.id,rosterId:event.notion_page_id,key:event.event_key,name:event.event,number:event.event_number,status:event.status,goldPoints:Number(event.gold_points),silverPoints:Number(event.silver_points),bronze1Points:Number(event.bronze_1_points),bronze2Points:Number(event.bronze_2_points)},participants:people.filter(x=>registered.has(x.id)).map(x=>({id:x.id,key:x.participant_key,name:x.participant,team:x.team||''})),pairs:pairs.map(x=>({id:x.id,pairNumber:x.pair_number,teams:[x.olympic_team],team:x.olympic_team,player1:byId.get(x.participant_1_id)?.participant||'',player2:byId.get(x.participant_2_id)?.participant||''})),state:card[0]?.state||{},updatedAt:card[0]?.updated_at||null};
+  let scorePairs=pairs.map(x=>({id:x.id,pairNumber:x.pair_number,teams:uniq([x.olympic_team]),team:x.olympic_team,player1:byId.get(x.participant_1_id)?.participant||'',player2:byId.get(x.participant_2_id)?.participant||''}));
+  if(key==='kahoot'){
+    const groups=new Map();
+    for(const ep of eventParticipants){
+      const n=Number(ep.event_team_number);
+      if(!Number.isFinite(n)||n<=0)continue;
+      if(!groups.has(n))groups.set(n,[]);
+      groups.get(n).push(ep);
+    }
+    scorePairs=[...groups.entries()].sort((a,b)=>a[0]-b[0]).map(([pairNumber,members])=>{
+      const sorted=[...members].sort((a,b)=>String(byId.get(a.participant_id)?.participant||'').localeCompare(String(byId.get(b.participant_id)?.participant||'')));
+      const p1=sorted[0],p2=sorted[1];
+      const memberTeams=uniq(sorted.map(x=>x.olympic_team||byId.get(x.participant_id)?.team||''));
+      return{id:`kahoot-${pairNumber}`,pairNumber,teams:memberTeams,team:memberTeams.length===1?memberTeams[0]:'',player1:p1?byId.get(p1.participant_id)?.participant||'':'',player2:p2?byId.get(p2.participant_id)?.participant||'':''};
+    });
+  }
+  return{ok:true,rule,event:{id:event.id,rosterId:event.notion_page_id,key:event.event_key,name:event.event,number:event.event_number,status:event.status,goldPoints:Number(event.gold_points),silverPoints:Number(event.silver_points),bronze1Points:Number(event.bronze_1_points),bronze2Points:Number(event.bronze_2_points)},participants:people.filter(x=>registered.has(x.id)).map(x=>({id:x.id,key:x.participant_key,name:x.participant,team:x.team||''})),pairs:scorePairs,state:card[0]?.state||{},updatedAt:card[0]?.updated_at||null};
 }
 async function save(env,key,state){const d=await load(env,key);state=normalizeThreePointState(key,state);if(['game','series'].includes(d.rule.mode)){const sides=state.sides||[],size=d.rule.combined?2:1,all=sides.flat();if(sides.length!==2||sides.some(x=>!Array.isArray(x)||x.length!==size)||all.some(x=>!TEAMS.includes(x))||new Set(all).size!==all.length)return Promise.reject(new Error(`Choose exactly ${size} different Olympic team${size===1?'':'s'} for each side.`))}const {podium,complete}=outcome(d.rule,state),status=complete?'Complete':Object.keys(state||{}).length?'In Progress':'Not Started';await sb(env,'event_scorecards?on_conflict=event_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({event_id:d.event.id,format_key:d.rule.mode,state})});await sb(env,`olympic_events?id=eq.${d.event.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({gold_teams:podium.gold,silver_teams:podium.silver,bronze_1_teams:podium.bronze1,bronze_2_teams:podium.bronze2,legacy_bronze_teams:[],status})});return load(env,key)}
 async function reset(env,key){const d=await load(env,key);await sb(env,'event_scorecards?on_conflict=event_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({event_id:d.event.id,format_key:d.rule.mode,state:{}})});await sb(env,`olympic_events?id=eq.${d.event.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({gold_teams:[],silver_teams:[],bronze_1_teams:[],bronze_2_teams:[],legacy_bronze_teams:[],status:'Not Started'})});return load(env,key)}
