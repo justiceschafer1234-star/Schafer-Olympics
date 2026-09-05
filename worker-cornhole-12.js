@@ -55,7 +55,15 @@ async function setRoutes(env,matches,count){
     L7:['L9',null],L8:['L9',null],W7:['GF1','L10'],L9:['L10',null],L10:['GF1',null],
     GF1:['GF2 if needed','GF2 if needed'],GF2:[null,null]
   };
-  const routes=count===12?routes12:routes10;
+  const routes14={
+    P1:['W1','L3'],P2:['W2','L1'],P3:['W2','L1'],P4:['W3','L5'],P5:['W4','L2'],P6:['W4','L2'],
+    W1:['W5','L3'],W2:['W5','L4'],W3:['W6','L5'],W4:['W6','L6'],
+    L1:['L4',null],L2:['L6',null],W5:['W7','L10'],W6:['W7','L9'],
+    L3:['L7',null],L4:['L7',null],L5:['L8',null],L6:['L8',null],
+    L7:['L9',null],L8:['L10',null],W7:['GF1','L12'],L9:['L11',null],L10:['L11',null],L11:['L12',null],L12:['GF1',null],
+    GF1:['GF2 if needed','GF2 if needed'],GF2:[null,null]
+  };
+  const routes=count===14?routes14:count===12?routes12:routes10;
   for(const [code,[winner_to,loser_to]] of Object.entries(routes)){
     const m=byCode.get(code);if(m){m.winner_to=winner_to;m.loser_to=loser_to;await patchMatch(env,m.id,{winner_to,loser_to})}
   }
@@ -70,8 +78,8 @@ async function seedCornhole(body,env){
     sb(env,`event_participants?select=id,event_id,participant_id,olympic_team,registered,event_team_number,seed,role,notes&event_id=eq.${event.id}`)
   ]);
   if(!pairs.length)return json({error:'Create and save Cornhole pairs first.'},400);
-  if(pairs.length>12)return json({error:'Cornhole supports a maximum of 12 pairs.'},400);
-  if(pairs.length===11)return json({error:'The Cornhole bracket supports up to 10 pairs or exactly 12 pairs. Add the 12th pair before seeding.'},400);
+  if(pairs.length>14)return json({error:'Cornhole supports a maximum of 14 pairs.'},400);
+  if(pairs.length===11||pairs.length===13)return json({error:'The Cornhole bracket supports up to 10 pairs, exactly 12 pairs, or exactly 14 pairs.'},400);
   const seeds=Array.isArray(body.seeds)?body.seeds:[];
   if(seeds.length!==pairs.length)return json({error:'Every Cornhole pair must have a seed.'},400);
   const pairById=new Map(pairs.map(p=>[p.id,p])),seedNums=new Set(),pairIds=new Set();
@@ -81,6 +89,7 @@ async function seedCornhole(body,env){
     seedNums.add(n);pairIds.add(id);
   }
   if(pairs.length===12&&!['P3','P4','L9','L10'].every(code=>matches.some(m=>m.match_code===code)))return json({error:'The 12-team Cornhole bracket database update is not installed.'},503);
+  if(pairs.length===14&&!['P1','P2','P3','P4','P5','P6','L11','L12'].every(code=>matches.some(m=>m.match_code===code)))return json({error:'The 14-team Cornhole bracket database update is not installed.'},503);
   const started=matches.some(m=>m.status==='Complete'||m.score_a!=null||m.score_b!=null);
   if(started&&!body.forceReset)return json({ok:false,needsResetConfirmation:true,error:'Cornhole has results. Confirm reset before reseeding.'},409);
 
@@ -123,11 +132,13 @@ async function seedCornhole(body,env){
     }));
   await bulkUpsert(env,'event_participants',participantSeedRows,'id');
 
-  const openings=pairs.length===12
-    ? [['P1',5,12],['P2',6,11],['P3',7,10],['P4',8,9],['W1',1,null],['W2',4,null],['W3',2,null],['W4',3,null]]
-    : pairs.length<=8
-      ? [['W1',1,8],['W2',4,5],['W3',2,7],['W4',3,6]]
-      : [['P1',8,9],['P2',7,10],['W1',1,null],['W2',4,5],['W3',2,null],['W4',3,6]];
+  const openings=pairs.length===14
+    ? [['P1',8,9],['P2',4,13],['P3',5,12],['P4',7,10],['P5',3,14],['P6',6,11],['W1',1,null],['W3',2,null]]
+    : pairs.length===12
+      ? [['P1',5,12],['P2',6,11],['P3',7,10],['P4',8,9],['W1',1,null],['W2',4,null],['W3',2,null],['W4',3,null]]
+      : pairs.length<=8
+        ? [['W1',1,8],['W2',4,5],['W3',2,7],['W4',3,6]]
+        : [['P1',8,9],['P2',7,10],['W1',1,null],['W2',4,5],['W3',2,null],['W4',3,6]];
   const byCode=new Map(matches.map(m=>[m.match_code,m]));
 
   // First place every seeded opening slot so bye advancement cannot be overwritten by a later opening update.
@@ -155,7 +166,7 @@ async function seedCornhole(body,env){
     await fillTarget(env,byCode.get(byeWinnerTo[code]),winner.label,winner.players);
   }
 
-  return json({ok:true,seeded:seeds.length,reset:started,format:pairs.length===12?'12-team double elimination':'standard double elimination'});
+  return json({ok:true,seeded:seeds.length,reset:started,format:pairs.length===14?'14-team double elimination':pairs.length===12?'12-team double elimination':'standard double elimination'});
 }
 
 export default{async fetch(request,env,ctx){
