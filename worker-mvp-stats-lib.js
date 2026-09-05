@@ -148,7 +148,7 @@ function cornholePlaces(matches,pairCount){
   const by=new Map(matches.map(m=>[String(m.match_code||''),m])),gf1=by.get('GF1'),gf2=by.get('GF2'),w7=by.get('W7');let champion='',runner='';
   if(gf2?.status==='Complete'&&gf2.winner){champion=gf2.winner;runner=gf2.loser}
   else if(gf1?.status==='Complete'&&gf1.winner&&w7?.winner&&gf1.winner===w7.winner){champion=gf1.winner;runner=gf1.loser}
-  const third=pairCount===12?by.get('L10')?.loser:by.get('L8')?.loser;
+  const third=pairCount>=14?by.get('L12')?.loser:pairCount===12?by.get('L10')?.loser:by.get('L8')?.loser;
   return new Map([[champion,1],[runner,2],[third,3]].filter(([x])=>x));
 }
 function calculateCornhole(ctx,event,rule,registered,snapshot){
