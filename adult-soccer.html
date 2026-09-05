@@ -10,82 +10,27 @@
 </head>
 <body>
   <div data-four-team-tournament data-endpoint="/api/adult-soccer">
-    <header class="hero">
-      <div class="wrap">
-        <a class="back" href="/gameday-hq">← Game Day HQ</a>
-        <p class="eyebrow">⚽ Schafer Olympics 2026</p>
-        <h1>Adult Soccer</h1>
-        <p class="subtitle">Four-team medal event: two semifinals, a bronze match, and the championship.</p>
-      </div>
-    </header>
+    <header class="hero"><div class="wrap"><a class="back" href="/gameday-hq">← Game Day HQ</a><p class="eyebrow">⚽ Schafer Olympics 2026</p><h1>Adult Soccer</h1><p class="subtitle">Four-team medal event: two semifinals, a bronze match, and the championship.</p></div></header>
     <main class="wrap main">
-      <div class="statusbar">
-        <span class="pill"><b data-complete-count>0</b>/4 games complete</span>
-        <span class="pill">Live scoring</span>
-      </div>
-
-      <section class="adult-rosters" aria-labelledby="adult-rosters-title">
-        <div class="adult-rosters__head">
-          <div>
-            <h2 id="adult-rosters-title">Adult Soccer Teams</h2>
-            <p>Only players registered for Adult Soccer are shown.</p>
-          </div>
-        </div>
-        <div id="adult-soccer-rosters" aria-live="polite">
-          <div class="adult-rosters__message">Loading registered Adult Soccer teams…</div>
-        </div>
-      </section>
-
+      <div class="statusbar"><span class="pill"><b data-complete-count>0</b>/4 games complete</span><span class="pill">Live scoring</span></div>
+      <section class="adult-rosters" aria-labelledby="adult-rosters-title"><div class="adult-rosters__head"><div><h2 id="adult-rosters-title">Adult Soccer Teams</h2><p>Only players registered for Adult Soccer are shown.</p></div></div><div id="adult-soccer-rosters" aria-live="polite"><div class="adult-rosters__message">Loading registered Adult Soccer teams…</div></div></section>
       <section class="bracket">
-        <div class="column">
-          <h2>Semifinals</h2>
-          <article class="match" data-match="SF1">
-            <div class="match__head"><span class="match__title">Semifinal 1</span><span class="match__state" data-state>Loading</span></div>
-            <div class="teamrow"><span class="team" data-team-a></span><input class="score" data-score-a type="number" min="0" inputmode="numeric" aria-label="Team A score"/></div>
-            <div class="teamrow"><span class="team" data-team-b></span><input class="score" data-score-b type="number" min="0" inputmode="numeric" aria-label="Team B score"/></div>
-            <div class="actions"><button class="save" data-save type="button">Save Result</button><button class="clear" data-clear type="button">Clear</button></div>
-            <div class="winnerline" data-winner hidden></div>
-          </article>
-          <article class="match" data-match="SF2">
-            <div class="match__head"><span class="match__title">Semifinal 2</span><span class="match__state" data-state>Loading</span></div>
-            <div class="teamrow"><span class="team" data-team-a></span><input class="score" data-score-a type="number" min="0" inputmode="numeric" aria-label="Team A score"/></div>
-            <div class="teamrow"><span class="team" data-team-b></span><input class="score" data-score-b type="number" min="0" inputmode="numeric" aria-label="Team B score"/></div>
-            <div class="actions"><button class="save" data-save type="button">Save Result</button><button class="clear" data-clear type="button">Clear</button></div>
-            <div class="winnerline" data-winner hidden></div>
-          </article>
+        <div class="column"><h2>Semifinals</h2>
+          <article class="match" data-match="SF1"><div class="match__head"><span class="match__title">Semifinal 1</span><span class="match__state" data-state>Loading</span></div><div class="teamrow"><span class="team" data-team-a></span><input class="score" data-score-a type="number" min="0" inputmode="numeric" aria-label="Team A score"/></div><div class="teamrow"><span class="team" data-team-b></span><input class="score" data-score-b type="number" min="0" inputmode="numeric" aria-label="Team B score"/></div><div class="actions"><button class="save" data-save type="button">Save Result</button><button class="clear" data-clear type="button">Clear</button></div><div class="winnerline" data-winner hidden></div></article>
+          <article class="match" data-match="SF2"><div class="match__head"><span class="match__title">Semifinal 2</span><span class="match__state" data-state>Loading</span></div><div class="teamrow"><span class="team" data-team-a></span><input class="score" data-score-a type="number" min="0" inputmode="numeric" aria-label="Team A score"/></div><div class="teamrow"><span class="team" data-team-b></span><input class="score" data-score-b type="number" min="0" inputmode="numeric" aria-label="Team B score"/></div><div class="actions"><button class="save" data-save type="button">Save Result</button><button class="clear" data-clear type="button">Clear</button></div><div class="winnerline" data-winner hidden></div></article>
         </div>
-        <div class="column">
-          <h2>Medal Games</h2>
-          <article class="match" data-match="B">
-            <div class="match__head"><span class="match__title">🥉 Bronze / 🟤 Copper Match</span><span class="match__state" data-state>Loading</span></div>
-            <div class="teamrow"><span class="team" data-team-a></span><input class="score" data-score-a type="number" min="0" inputmode="numeric"/></div>
-            <div class="teamrow"><span class="team" data-team-b></span><input class="score" data-score-b type="number" min="0" inputmode="numeric"/></div>
-            <div class="actions"><button class="save" data-save type="button">Save Result</button><button class="clear" data-clear type="button">Clear</button></div>
-            <div class="winnerline" data-winner hidden></div>
-          </article>
-          <article class="match" data-match="F">
-            <div class="match__head"><span class="match__title">🏆 Championship</span><span class="match__state" data-state>Loading</span></div>
-            <div class="teamrow"><span class="team" data-team-a></span><input class="score" data-score-a type="number" min="0" inputmode="numeric"/></div>
-            <div class="teamrow"><span class="team" data-team-b></span><input class="score" data-score-b type="number" min="0" inputmode="numeric"/></div>
-            <div class="actions"><button class="save" data-save type="button">Save Result</button><button class="clear" data-clear type="button">Clear</button></div>
-            <div class="winnerline" data-winner hidden></div>
-          </article>
+        <div class="column"><h2>Medal Games</h2>
+          <article class="match" data-match="B"><div class="match__head"><span class="match__title">🥉 Bronze / 🟤 Copper Match</span><span class="match__state" data-state>Loading</span></div><div class="teamrow"><span class="team" data-team-a></span><input class="score" data-score-a type="number" min="0" inputmode="numeric"/></div><div class="teamrow"><span class="team" data-team-b></span><input class="score" data-score-b type="number" min="0" inputmode="numeric"/></div><div class="actions"><button class="save" data-save type="button">Save Result</button><button class="clear" data-clear type="button">Clear</button></div><div class="winnerline" data-winner hidden></div></article>
+          <article class="match" data-match="F"><div class="match__head"><span class="match__title">🏆 Championship</span><span class="match__state" data-state>Loading</span></div><div class="teamrow"><span class="team" data-team-a></span><input class="score" data-score-a type="number" min="0" inputmode="numeric"/></div><div class="teamrow"><span class="team" data-team-b></span><input class="score" data-score-b type="number" min="0" inputmode="numeric"/></div><div class="actions"><button class="save" data-save type="button">Save Result</button><button class="clear" data-clear type="button">Clear</button></div><div class="winnerline" data-winner hidden></div></article>
         </div>
       </section>
-      <section class="medals">
-        <h2>Final Finish</h2>
-        <div class="podium">
-          <div class="medal">🥇 Gold<strong data-gold>TBD</strong></div>
-          <div class="medal">🥈 Silver<strong data-silver>TBD</strong></div>
-          <div class="medal">🥉 Bronze<strong data-bronze>TBD</strong></div>
-          <div class="medal copper">🟤 Copper<strong data-copper>TBD</strong></div>
-        </div>
-      </section>
+      <section class="medals"><h2>Final Finish</h2><div class="podium" id="adult-soccer-final-finish"><div class="medal">🥇 Gold<strong data-gold>TBD</strong></div><div class="medal">🥈 Silver<strong data-silver>TBD</strong></div><div class="medal">🥉 Bronze<strong data-bronze>TBD</strong></div><div class="medal copper" id="adult-soccer-copper">🟤 Copper<strong data-copper>TBD</strong></div></div></section>
       <p class="note" data-sync-note>Adult Soccer results update the Olympic event and overall standings automatically.</p>
     </main>
   </div>
   <script src="/no-zoom.js" defer></script>
-  <script src="/four-team-tournament.js?v=4" defer></script>
+  <script src="/four-team-tournament.js?v=5" defer></script>
   <script src="/adult-soccer-rosters.js?v=1" defer></script>
+  <script>document.addEventListener('DOMContentLoaded',()=>{const podium=document.getElementById('adult-soccer-final-finish');if(!podium)return;const cards=[...podium.querySelectorAll('.medal')];cards.slice(4).forEach(card=>card.remove());const copper=podium.querySelector('#adult-soccer-copper');podium.querySelectorAll('.copper').forEach(card=>{if(card!==copper)card.remove()});});</script>
 </body>
 </html>
