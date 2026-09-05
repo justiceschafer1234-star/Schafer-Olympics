@@ -2,19 +2,21 @@ import app from './worker-public-teams.js';
 import {adminMvpStats,getPlayerMvp,loadMvpSnapshot} from './worker-mvp-stats-lib.js';
 
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
-const NFC_HASHES={
-  'Team Red':'01a5fe816e17ebc20646f9d7f9b060834a7d10734bc61573cb17e9060f5ea3a1',
-  'Team Blue':'ad7a8c7a3ce808bd6181f499a52b0b3b4e8edc16f74fafb3b5036c89608f456c',
-  'Team Green':'135664d21bf91ac73af53b09c14d2c71bbf5bd65367c01864d18cdb1f6dd946a',
-  'Team Gold':'5fb547298db39ef05bf26eb43c70cd97a90980546031d46b03331954e90fa461'
-};
+const base=e=>String(e.SUPABASE_URL||'').replace(/\/+$/,'').replace(/\/rest\/v1$/,'');
 async function sha256(value){const bytes=new TextEncoder().encode(String(value||'')),digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+async function validNfcToken(env,team,token){
+  const url=base(env);if(!url||!env.SUPABASE_SECRET_KEY||!team||!token)return false;
+  const r=await fetch(`${url}/rest/v1/nfc_team_access_tokens?select=token_hash,enabled&team=eq.${encodeURIComponent(team)}&limit=1`,{headers:{apikey:env.SUPABASE_SECRET_KEY,'Content-Type':'application/json'},cache:'no-store'});
+  if(!r.ok)return false;const rows=await r.json().catch(()=>[]),row=rows?.[0];
+  return Boolean(row?.enabled)&&String(row.token_hash||'')===await sha256(token);
+}
 async function nfcMvpStats(request,env){
   if(request.method!=='POST')return json({error:'Method not allowed'},405);
   let body={};try{body=await request.json()}catch{return json({error:'Invalid request.'},400)}
-  const team=String(body.team||''),expected=NFC_HASHES[team];
-  if(!expected||await sha256(body.nfcToken)!==expected)return json({error:'Invalid NFC access.'},401);
-  const forwarded=new Request(request.url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,code:env.ADMIN_SCORE_CODE,nfcToken:undefined})});
+  const team=String(body.team||'');
+  if(!await validNfcToken(env,team,body.nfcToken))return json({error:'Invalid NFC access.'},401);
+  const safeBody={...body,code:env.ADMIN_SCORE_CODE};delete safeBody.nfcToken;
+  const forwarded=new Request(request.url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(safeBody)});
   return adminMvpStats(forwarded,env);
 }
 async function playerHqWithMvp(request,env,ctx){
