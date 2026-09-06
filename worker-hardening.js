@@ -55,12 +55,17 @@ async function readOnlyCornhole(env){
 function eventPoints(r){
   if(r?.status!=='Complete')return Object.fromEntries(SCORE_TEAMS.map(t=>[t,0]));
   const overrides=r?.team_point_overrides&&typeof r.team_point_overrides==='object'?r.team_point_overrides:{};
-  if(Object.keys(overrides).length)return Object.fromEntries(SCORE_TEAMS.map(t=>[t,scoreNum(overrides[t])]));
   const out=Object.fromEntries(SCORE_TEAMS.map(t=>[t,0]));
-  for(const t of r.gold_teams||[])if(t in out)out[t]+=scoreNum(r.gold_points);
-  for(const t of r.silver_teams||[])if(t in out)out[t]+=scoreNum(r.silver_points);
-  for(const t of r.bronze_1_teams||[])if(t in out)out[t]+=scoreNum(r.bronze_1_points);
-  for(const t of r.bronze_2_teams||[])if(t in out)out[t]+=scoreNum(r.bronze_2_points);
+  for(const team of SCORE_TEAMS){
+    if(Object.prototype.hasOwnProperty.call(overrides,team)){
+      out[team]=scoreNum(overrides[team]);
+      continue;
+    }
+    if((r.gold_teams||[]).includes(team))out[team]+=scoreNum(r.gold_points);
+    if((r.silver_teams||[]).includes(team))out[team]+=scoreNum(r.silver_points);
+    if((r.bronze_1_teams||[]).includes(team))out[team]+=scoreNum(r.bronze_1_points);
+    if((r.bronze_2_teams||[]).includes(team))out[team]+=scoreNum(r.bronze_2_points);
+  }
   return out;
 }
 
